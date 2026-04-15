@@ -1,10 +1,6 @@
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-
-// Only import these for React Native
-import { Platform } from "react-native";
-
-let auth;
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUCbie6-sNH1dPJypq-E_J6TjedP-hy1M",
@@ -18,21 +14,7 @@ const firebaseConfig = {
 const app =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// ✅ FIX: Different setup for web vs mobile
-if (Platform.OS === "web") {
-  auth = getAuth(app);
-} else {
-  const {
-    initializeAuth,
-    getReactNativePersistence,
-  } = require("firebase/auth");
-  const AsyncStorage =
-    require("@react-native-async-storage/async-storage").default;
+export const auth = getAuth(app);
+export const db = getFirestore(app);
 
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-}
-
-export { auth };
 export default app;
