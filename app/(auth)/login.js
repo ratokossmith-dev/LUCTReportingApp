@@ -88,7 +88,7 @@ export default function LoginScreen() {
         <View style={styles.logoBox}>
           <Text style={styles.logoText}>L</Text>
         </View>
-        <Text style={styles.title}>LUCT Reportingfghh</Text>
+        <Text style={styles.title}>LUCT Reporting</Text>
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
         <Text style={styles.label}>Email Address</Text>
