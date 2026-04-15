@@ -12,7 +12,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View } from "react-native";
+  View,
+} from "react-native";
 import { auth } from "../../config/auth";
 import { db } from "../../config/firebase";
 
@@ -52,7 +53,8 @@ export default function LoginScreen() {
               else if (role === "lecturer") router.replace("/(lecturer)");
               else if (role === "prl") router.replace("/(prl)");
               else if (role === "pl") router.replace("/(pl)");
-            } },
+            },
+          },
         ]);
       } else {
         Alert.alert("Error", "User profile not found. Please register again.");
@@ -86,7 +88,7 @@ export default function LoginScreen() {
         <View style={styles.logoBox}>
           <Text style={styles.logoText}>L</Text>
         </View>
-        <Text style={styles.title}>LUCT Reporting</Text>
+        <Text style={styles.title}>LUCT Reportingfghh</Text>
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
         <Text style={styles.label}>Email Address</Text>
@@ -141,7 +143,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#0a0f2c",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24 },
+    padding: 24,
+  },
   logoBox: {
     width: 60,
     height: 60,
@@ -149,7 +152,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16 },
+    marginBottom: 16,
+  },
   logoText: { color: "#fff", fontSize: 28, fontWeight: "700" },
   title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 6 },
   subtitle: { fontSize: 14, color: "#6b7280", marginBottom: 36 },
@@ -157,7 +161,8 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
     fontSize: 13,
     alignSelf: "flex-start",
-    marginBottom: 6 },
+    marginBottom: 6,
+  },
   input: {
     width: "100%",
     backgroundColor: "#1a1f3c",
@@ -167,7 +172,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
-    fontSize: 15 },
+    fontSize: 15,
+  },
   button: {
     width: "100%",
     backgroundColor: "#4f46e5",
@@ -175,7 +181,9 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: "center",
     marginBottom: 16,
-    marginTop: 8 },
+    marginTop: 8,
+  },
   buttonDisabled: { backgroundColor: "#3730a3" },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  linkText: { color: "#4f46e5", fontSize: 14 } });
+  linkText: { color: "#4f46e5", fontSize: 14 },
+});
