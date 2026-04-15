@@ -12,16 +12,26 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const prof = await getUserProfile(firebaseUser.uid);
-        setProfile(prof);
-      } else {
+      try {
+        if (firebaseUser) {
+          setUser(firebaseUser);
+
+          // fetch role/profile ONCE here
+          const prof = await getUserProfile(firebaseUser.uid);
+          setProfile(prof || null);
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
+      } catch (error) {
+        console.log("Auth error:", error);
         setUser(null);
         setProfile(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
+
     return unsubscribe;
   }, []);
 
