@@ -1,4 +1,5 @@
 import { Slot, useRouter } from "expo-router";
+<<<<<<< HEAD
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
@@ -43,6 +44,21 @@ function RootLayoutNav() {
     if (loading) return;
     if (hasNavigated.current) return;
     hasNavigated.current = true;
+=======
+import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider, useAuth } from "../config/AuthContext";
+
+function RootLayoutNav() {
+  const { user, profile, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const role = profile?.role;
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
 
     if (!user) {
       router.replace("/(auth)/login");
@@ -57,6 +73,7 @@ function RootLayoutNav() {
     } else {
       router.replace("/(auth)/login");
     }
+<<<<<<< HEAD
   }, [loading, user, role]);
 
   if (loading) {
@@ -88,6 +105,14 @@ function RootLayoutNav() {
         >
           <Text style={{ color: "#fff", fontWeight: "600" }}>Go to Login</Text>
         </TouchableOpacity>
+=======
+  }, [user, profile, loading]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
       </View>
     );
   }

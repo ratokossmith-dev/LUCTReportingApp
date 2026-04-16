@@ -12,7 +12,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+<<<<<<< HEAD
   View } from "react-native";
+=======
+  View,
+} from "react-native";
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
 import { auth } from "../../config/auth";
 import { db } from "../../config/firebase";
 
@@ -52,7 +57,12 @@ export default function LoginScreen() {
               else if (role === "lecturer") router.replace("/(lecturer)");
               else if (role === "prl") router.replace("/(prl)");
               else if (role === "pl") router.replace("/(pl)");
+<<<<<<< HEAD
             } },
+=======
+            },
+          },
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
         ]);
       } else {
         Alert.alert("Error", "User profile not found. Please register again.");
@@ -141,7 +151,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#0a0f2c",
     alignItems: "center",
     justifyContent: "center",
+<<<<<<< HEAD
     padding: 24 },
+=======
+    padding: 24,
+  },
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   logoBox: {
     width: 60,
     height: 60,
@@ -149,7 +164,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+<<<<<<< HEAD
     marginBottom: 16 },
+=======
+    marginBottom: 16,
+  },
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   logoText: { color: "#fff", fontSize: 28, fontWeight: "700" },
   title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 6 },
   subtitle: { fontSize: 14, color: "#6b7280", marginBottom: 36 },
@@ -157,7 +177,12 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
     fontSize: 13,
     alignSelf: "flex-start",
+<<<<<<< HEAD
     marginBottom: 6 },
+=======
+    marginBottom: 6,
+  },
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   input: {
     width: "100%",
     backgroundColor: "#1a1f3c",
@@ -167,7 +192,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
+<<<<<<< HEAD
     fontSize: 15 },
+=======
+    fontSize: 15,
+  },
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   button: {
     width: "100%",
     backgroundColor: "#4f46e5",
@@ -175,7 +205,16 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: "center",
     marginBottom: 16,
+<<<<<<< HEAD
     marginTop: 8 },
   buttonDisabled: { backgroundColor: "#3730a3" },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   linkText: { color: "#4f46e5", fontSize: 14 } });
+=======
+    marginTop: 8,
+  },
+  buttonDisabled: { backgroundColor: "#3730a3" },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  linkText: { color: "#4f46e5", fontSize: 14 },
+});
+>>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
