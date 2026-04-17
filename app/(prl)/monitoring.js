@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,158 +16,140 @@ import {
 
 export default function PRLMonitoring() {
   const [lecturers, setLecturers] = useState([]);
-  const [lecturerStats, setLecturerStats] = useState({});
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    (async () => {
+      try {
+        const lects = await getAllLecturers();
+        setLecturers(lects);
+        const m = {};
+        await Promise.all(
+          lects.map(async (l) => {
+            const [r, rat] = await Promise.all([
+              getReportsByLecturer(l.id),
+              getRatingsByLecturer(l.id),
+            ]);
+            const avg =
+              rat.length > 0
+                ? (rat.reduce((a, b) => a + b.rating, 0) / rat.length).toFixed(
+                    1,
+                  )
+                : "N/A";
+            const att =
+              r.length > 0
+                ? Math.round(
+                    r.reduce(
+                      (a, b) =>
+                        a +
+                        (b.actualStudentsPresent / b.totalRegisteredStudents) *
+                          100,
+                      0,
+                    ) / r.length,
+                  )
+                : 0;
+            m[l.id] = {
+              reports: r.length,
+              rating: avg,
+              attendance: att,
+              reviewed: r.filter((rp) => rp.status === "Reviewed").length,
+            };
+          }),
+        );
+        setStats(m);
+      } catch (e) {
+        console.log("PRL monitoring error:", e);
+      }
+      setLoading(false);
+    })();
   }, []);
 
-  const loadData = async () => {
-    try {
-      const lects = await getAllLecturers();
-      setLecturers(lects);
-      const statsMap = {};
-      await Promise.all(
-        lects.map(async (l) => {
-          const [reports, ratings] = await Promise.all([
-            getReportsByLecturer(l.id),
-            getRatingsByLecturer(l.id),
-          ]);
-          const avgRating =
-            ratings.length > 0
-              ? (
-                  ratings.reduce((a, b) => a + b.rating, 0) / ratings.length
-                ).toFixed(1)
-              : "N/A";
-          const avgAttendance =
-            reports.length > 0
-              ? Math.round(
-                  reports.reduce(
-                    (a, b) =>
-                      a +
-                      (b.actualStudentsPresent / b.totalRegisteredStudents) *
-                        100,
-                    0,
-                  ) / reports.length,
-                )
-              : 0;
-          statsMap[l.id] = {
-            reports: reports.length,
-            rating: avgRating,
-            attendance: avgAttendance,
-          };
-        }),
-      );
-      setLecturerStats(statsMap);
-    } catch (e) {
-      console.log("Error:", e);
-    }
-    setLoading(false);
-  };
-
-  const getColor = (val) => {
-    if (val >= 90) return "#10b981";
-    if (val >= 75) return "#f59e0b";
-    return "#ef4444";
-  };
+  const color = (v) => (v >= 90 ? "#10b981" : v >= 75 ? "#f59e0b" : "#ef4444");
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Monitoring</Text>
+          <Text style={s.title}>Lecturer Monitoring</Text>
           <View style={{ width: 50 }} />
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#4f46e5" }]}>
-              {lecturers.length}
-            </Text>
-            <Text style={styles.statLabel}>Lecturers</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#10b981" }]}>
-              {Object.values(lecturerStats).reduce((a, b) => a + b.reports, 0)}
-            </Text>
-            <Text style={styles.statLabel}>Total Reports</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Lecturer Performance</Text>
+        <Text style={s.section}>
+          All Lecturers Performance ({lecturers.length})
+        </Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
         ) : lecturers.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No lecturers found</Text>
+          <View style={s.empty}>
+            <Text style={s.emptyText}>No registered lecturers yet.</Text>
           </View>
         ) : (
-          lecturers.map((lecturer) => {
-            const stats = lecturerStats[lecturer.id] || {};
+          lecturers.map((l) => {
+            const st = stats[l.id] || {};
             return (
-              <View key={lecturer.id} style={styles.lecturerCard}>
-                <View style={styles.lecturerHeader}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
-                      {lecturer.name?.charAt(0) || "L"}
+              <View key={l.id} style={s.card}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 14,
+                    gap: 12,
+                  }}
+                >
+                  <View style={s.avatar}>
+                    <Text style={s.avatarText}>{l.name?.charAt(0) || "L"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.lecName}>{l.name}</Text>
+                    <Text style={s.lecEmail}>{l.email}</Text>
+                    <Text style={s.lecStat}>
+                      📋 {st.reports || 0} reports • ✅ {st.reviewed || 0}{" "}
+                      reviewed
                     </Text>
                   </View>
-                  <View style={styles.lecturerInfo}>
-                    <Text style={styles.lecturerName}>{lecturer.name}</Text>
-                    <Text style={styles.lecturerEmail}>{lecturer.email}</Text>
-                  </View>
-                  <View style={styles.ratingBadge}>
-                    <Text style={styles.ratingText}>
-                      ⭐ {stats.rating || "N/A"}
-                    </Text>
+                  <View style={s.ratingBadge}>
+                    <Text style={s.ratingText}>⭐ {st.rating || "N/A"}</Text>
                   </View>
                 </View>
-                <View style={styles.progressSection}>
-                  <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>Reports Submitted</Text>
-                    <Text style={styles.progressValue}>
-                      {stats.reports || 0}
-                    </Text>
-                  </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text style={s.progLabel}>Avg Attendance</Text>
+                  <Text
+                    style={[s.progVal, { color: color(st.attendance || 0) }]}
+                  >
+                    {st.attendance || 0}%
+                  </Text>
                 </View>
-                <View style={styles.progressSection}>
-                  <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>Avg Attendance</Text>
-                    <Text
-                      style={[
-                        styles.progressValue,
-                        { color: getColor(stats.attendance || 0) },
-                      ]}
-                    >
-                      {stats.attendance || 0}%
-                    </Text>
-                  </View>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${stats.attendance || 0}%`,
-                          backgroundColor: getColor(stats.attendance || 0),
-                        },
-                      ]}
-                    />
-                  </View>
+                <View style={s.progBar}>
+                  <View
+                    style={[
+                      s.progFill,
+                      {
+                        width: `${st.attendance || 0}%`,
+                        backgroundColor: color(st.attendance || 0),
+                      },
+                    ]}
+                  />
                 </View>
               </View>
             );
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 20 },
   header: {
@@ -178,27 +159,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
-  statBox: {
-    flex: 1,
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  statValue: { fontSize: 28, fontWeight: "700" },
-  statLabel: { color: "#6b7280", fontSize: 12, marginTop: 4 },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  emptyBox: {
+  back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  empty: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
     padding: 24,
@@ -207,19 +171,13 @@ const styles = StyleSheet.create({
     borderColor: "#2a2f5c",
   },
   emptyText: { color: "#6b7280", fontSize: 14 },
-  lecturerCard: {
+  card: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
-  },
-  lecturerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 14,
-    gap: 12,
   },
   avatar: {
     width: 44,
@@ -230,9 +188,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  lecturerInfo: { flex: 1 },
-  lecturerName: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  lecturerEmail: { color: "#6b7280", fontSize: 12, marginTop: 2 },
+  lecName: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  lecEmail: { color: "#6b7280", fontSize: 12, marginTop: 2 },
+  lecStat: { color: "#9ca3af", fontSize: 11, marginTop: 2 },
   ratingBadge: {
     backgroundColor: "#0a0f2c",
     borderRadius: 8,
@@ -242,14 +200,8 @@ const styles = StyleSheet.create({
     borderColor: "#f59e0b",
   },
   ratingText: { color: "#f59e0b", fontSize: 13, fontWeight: "600" },
-  progressSection: { marginBottom: 10 },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  progressLabel: { color: "#9ca3af", fontSize: 12 },
-  progressValue: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  progressBar: { height: 6, backgroundColor: "#0a0f2c", borderRadius: 3 },
-  progressFill: { height: 6, borderRadius: 3 },
+  progLabel: { color: "#9ca3af", fontSize: 12 },
+  progVal: { fontSize: 12, fontWeight: "600" },
+  progBar: { height: 6, backgroundColor: "#0a0f2c", borderRadius: 3 },
+  progFill: { height: 6, borderRadius: 3 },
 });

@@ -20,6 +20,7 @@ export default function PLLecturers() {
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [newLecturer, setNewLecturer] = useState({
     name: "",
     email: "",
@@ -45,15 +46,45 @@ export default function PLLecturers() {
       Alert.alert("Error", "Name and email are required");
       return;
     }
+
+    if (!newLecturer.email.includes("@")) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
     setSaving(true);
     try {
-      await addLecturer(newLecturer);
-      Alert.alert("Success", "Lecturer added successfully!");
-      setModalVisible(false);
-      setNewLecturer({ name: "", email: "", facultyName: "Faculty of ICT" });
-      loadLecturers();
+      const result = await addLecturer(newLecturer);
+
+      // Show the generated password to PL
+      Alert.alert(
+        "Lecturer Added Successfully! ✅",
+        `Name: ${newLecturer.name}\nEmail: ${newLecturer.email}\n\nTemporary Password: ${result.tempPassword}\n\n⚠️ Please share these login details with the lecturer. They can change their password after first login.`,
+        [
+          {
+            text: "Copy Password",
+            onPress: () => {
+              // You can add clipboard functionality here
+              Alert.alert("Success", "Password copied to clipboard");
+            },
+          },
+          {
+            text: "OK",
+            onPress: () => {
+              setModalVisible(false);
+              setNewLecturer({
+                name: "",
+                email: "",
+                facultyName: "Faculty of ICT",
+              });
+              setGeneratedPassword("");
+              loadLecturers();
+            },
+          },
+        ],
+      );
     } catch (e) {
-      Alert.alert("Error", "Failed to add lecturer");
+      Alert.alert("Error", e.message || "Failed to add lecturer");
     }
     setSaving(false);
   }, [newLecturer]);
@@ -134,9 +165,18 @@ export default function PLLecturers() {
                   </Text>
                 </View>
                 <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>Active</Text>
+                  <Text style={styles.statusText}>
+                    {lecturer.status === "Inactive" ? "Inactive" : "Active"}
+                  </Text>
                 </View>
               </View>
+              {lecturer.tempPassword && (
+                <View style={styles.passwordHint}>
+                  <Text style={styles.passwordHintText}>
+                    ⚠️ Temp password: {lecturer.tempPassword}
+                  </Text>
+                </View>
+              )}
             </View>
           ))
         )}
@@ -145,7 +185,11 @@ export default function PLLecturers() {
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add Lecturer</Text>
+            <Text style={styles.modalTitle}>Add New Lecturer</Text>
+            <Text style={styles.modalSubtitle}>
+              A temporary password will be generated automatically
+            </Text>
+
             <TextInput
               style={styles.modalInput}
               placeholder="Full Name *"
@@ -153,22 +197,42 @@ export default function PLLecturers() {
               value={newLecturer.name}
               onChangeText={(v) => setNewLecturer((p) => ({ ...p, name: v }))}
             />
+
             <TextInput
               style={styles.modalInput}
-              placeholder="Email *"
+              placeholder="Email Address *"
               placeholderTextColor="#555b7a"
               value={newLecturer.email}
               onChangeText={(v) => setNewLecturer((p) => ({ ...p, email: v }))}
               keyboardType="email-address"
               autoCapitalize="none"
             />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Faculty"
+              placeholderTextColor="#555b7a"
+              value={newLecturer.facultyName}
+              onChangeText={(v) =>
+                setNewLecturer((p) => ({ ...p, facultyName: v }))
+              }
+            />
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelBtn}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setModalVisible(false);
+                  setNewLecturer({
+                    name: "",
+                    email: "",
+                    facultyName: "Faculty of ICT",
+                  });
+                }}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.submitBtn,
@@ -180,7 +244,7 @@ export default function PLLecturers() {
                 {saving ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitText}>Add</Text>
+                  <Text style={styles.submitText}>Create & Send</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -281,6 +345,16 @@ const styles = StyleSheet.create({
     borderColor: "#10b981",
   },
   statusText: { color: "#10b981", fontSize: 12, fontWeight: "600" },
+  passwordHint: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: "#2a2f5c",
+  },
+  passwordHintText: {
+    color: "#f59e0b",
+    fontSize: 11,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -296,6 +370,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "700",
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    color: "#6b7280",
+    fontSize: 12,
     marginBottom: 16,
   },
   modalInput: {

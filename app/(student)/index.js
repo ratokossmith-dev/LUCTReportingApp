@@ -3,7 +3,6 @@ import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,37 +25,27 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
-    loadData();
+    if (!profile?.id) return;
+    (async () => {
+      try {
+        const [c, a, r] = await Promise.all([
+          getStudentCourses(profile.id),
+          getStudentAttendance(profile.id),
+          getStudentRatings(profile.id),
+        ]);
+        setCourses(c);
+        setAttendance(a);
+        setRatings(r);
+      } catch (e) {
+        console.log("Dashboard error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
 
-  const loadData = async () => {
-    try {
-      const [c, a, r] = await Promise.all([
-        getStudentCourses(profile.id),
-        getStudentAttendance(profile.id),
-        getStudentRatings(profile.id),
-      ]);
-      setCourses(c);
-      setAttendance(a);
-      setRatings(r);
-    } catch (e) {
-      console.log("Error:", e);
-    }
-    setLoading(false);
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/(auth)/login");
-  };
-
-  const presentCount = attendance.filter((a) => a.present).length;
-  const attendanceRate =
-    attendance.length > 0
-      ? Math.round((presentCount / attendance.length) * 100)
-      : 0;
-
+  const present = attendance.filter((a) => a.present).length;
+  const rate =
+    attendance.length > 0 ? Math.round((present / attendance.length) * 100) : 0;
   const initials = profile?.name
     ? profile.name
         .split(" ")
@@ -66,103 +55,97 @@ export default function StudentDashboard() {
         .slice(0, 2)
     : "ST";
 
-  const menuItems = [
+  const menu = [
     {
       icon: "📊",
       title: "Monitoring",
-      subtitle: "Track your progress",
+      sub: "Track your progress",
       route: "/(student)/monitoring",
     },
     {
       icon: "📅",
       title: "Attendance",
-      subtitle: "View your attendance",
+      sub: "View your attendance records",
       route: "/(student)/attendance",
     },
     {
       icon: "⭐",
       title: "Rate Lecturer",
-      subtitle: "Give feedback",
+      sub: "Give feedback to your lecturer",
       route: "/(student)/rating",
     },
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.greeting}>Welcome back 👋</Text>
-            <Text style={styles.name}>{profile?.name || "Student"}</Text>
-            <Text style={styles.faculty}>
+            <Text style={s.greeting}>Welcome back 👋</Text>
+            <Text style={s.name}>{profile?.name || "Student"}</Text>
+            <Text style={s.role}>
               {profile?.facultyName || "Faculty of ICT"}
             </Text>
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+          <View style={[s.avatar, { backgroundColor: "#10b981" }]}>
+            <Text style={s.avatarText}>{initials}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Overview</Text>
+        <Text style={s.section}>Overview</Text>
         {loading ? (
-          <ActivityIndicator color="#4f46e5" style={{ marginBottom: 28 }} />
+          <ActivityIndicator color="#10b981" style={{ marginBottom: 28 }} />
         ) : (
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: "#10b981" }]}>
-                {attendanceRate}%
-              </Text>
-              <Text style={styles.statLabel}>Attendance</Text>
+          <View style={s.grid}>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#10b981" }]}>{rate}%</Text>
+              <Text style={s.statLabel}>Attendance Rate</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: "#4f46e5" }]}>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#4f46e5" }]}>
                 {courses.length}
               </Text>
-              <Text style={styles.statLabel}>Courses</Text>
+              <Text style={s.statLabel}>Enrolled Courses</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: "#f59e0b" }]}>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#f59e0b" }]}>{present}</Text>
+              <Text style={s.statLabel}>Sessions Present</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#ec4899" }]}>
                 {ratings.length}
               </Text>
-              <Text style={styles.statLabel}>Ratings Given</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: "#ec4899" }]}>
-                {attendance.length}
-              </Text>
-              <Text style={styles.statLabel}>Classes</Text>
+              <Text style={s.statLabel}>Ratings Given</Text>
             </View>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Current Courses</Text>
+        <Text style={s.section}>My Enrolled Courses</Text>
         {loading ? (
-          <ActivityIndicator color="#4f46e5" />
+          <ActivityIndicator color="#10b981" />
         ) : courses.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No courses found</Text>
+          <View style={s.empty}>
+            <Text style={s.emptyIcon}>📚</Text>
+            <Text style={s.emptyTitle}>No courses yet</Text>
+            <Text style={s.emptyText}>
+              You will be automatically enrolled when a lecturer creates a
+              class.
+            </Text>
           </View>
         ) : (
-          <View style={styles.coursesCard}>
-            {courses.slice(0, 5).map((course, index) => (
+          <View style={s.card}>
+            {courses.map((c, i) => (
               <View
-                key={course.id}
-                style={[
-                  styles.courseItem,
-                  index !== courses.length - 1 && styles.courseItemBorder,
-                ]}
+                key={c.id || i}
+                style={[s.row, i !== courses.length - 1 && s.rowBorder]}
               >
-                <View style={styles.courseCode}>
-                  <Text style={styles.courseCodeText}>
-                    {course.courseCode || course.code}
-                  </Text>
+                <View style={s.codeBadge}>
+                  <Text style={s.codeText}>{c.courseCode || "N/A"}</Text>
                 </View>
-                <View style={styles.courseInfo}>
-                  <Text style={styles.courseName}>
-                    {course.courseName || course.name}
-                  </Text>
-                  <Text style={styles.courseLecturer}>
-                    {course.lecturerName || "TBA"}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.courseName}>{c.courseName || "N/A"}</Text>
+                  <Text style={s.courseSub}>
+                    Lecturer: {c.lecturerName || "TBA"}
                   </Text>
                 </View>
               </View>
@@ -170,35 +153,41 @@ export default function StudentDashboard() {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.menuList}>
-          {menuItems.map((item, index) => (
+        <Text style={s.section}>Quick Actions</Text>
+        <View style={s.menuList}>
+          {menu.map((item, i) => (
             <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
+              key={i}
+              style={s.menuItem}
               onPress={() => router.push(item.route)}
             >
-              <View style={styles.menuIcon}>
-                <Text style={styles.menuIconText}>{item.icon}</Text>
+              <View style={s.menuIcon}>
+                <Text style={{ fontSize: 20 }}>{item.icon}</Text>
               </View>
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.menuTitle}>{item.title}</Text>
+                <Text style={s.menuSub}>{item.sub}</Text>
               </View>
-              <Text style={styles.menuArrow}>›</Text>
+              <Text style={[s.arrow, { color: "#10b981" }]}>›</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity
+          style={s.logout}
+          onPress={async () => {
+            await signOut(auth);
+            router.replace("/(auth)/login");
+          }}
+        >
+          <Text style={s.logoutText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 24 },
   header: {
@@ -210,28 +199,17 @@ const styles = StyleSheet.create({
   },
   greeting: { color: "#6b7280", fontSize: 14, marginBottom: 4 },
   name: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 2 },
-  faculty: { color: "#10b981", fontSize: 12 },
+  role: { color: "#10b981", fontSize: 12 },
   avatar: {
     width: 50,
     height: 50,
-    backgroundColor: "#10b981",
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 14,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 28,
-  },
+  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 14 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   statCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
@@ -240,19 +218,26 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
-  statLabel: { color: "#6b7280", fontSize: 12 },
-  emptyBox: {
+  statVal: { fontSize: 26, fontWeight: "700", marginBottom: 4 },
+  statLabel: { color: "#6b7280", fontSize: 11 },
+  empty: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
-    padding: 24,
+    padding: 28,
     alignItems: "center",
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
     marginBottom: 28,
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
-  coursesCard: {
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  emptyText: { color: "#6b7280", fontSize: 12, textAlign: "center" },
+  card: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
     padding: 4,
@@ -260,26 +245,20 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  courseItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    gap: 12,
-  },
-  courseItemBorder: { borderBottomWidth: 0.5, borderBottomColor: "#2a2f5c" },
-  courseCode: {
+  row: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  rowBorder: { borderBottomWidth: 0.5, borderBottomColor: "#2a2f5c" },
+  codeBadge: {
     backgroundColor: "#0a0f2c",
     borderRadius: 8,
     padding: 8,
-    minWidth: 70,
+    minWidth: 72,
     alignItems: "center",
     borderWidth: 0.5,
     borderColor: "#4f46e5",
   },
-  courseCodeText: { color: "#4f46e5", fontSize: 11, fontWeight: "600" },
-  courseInfo: { flex: 1 },
+  codeText: { color: "#4f46e5", fontSize: 11, fontWeight: "700" },
   courseName: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  courseLecturer: { color: "#6b7280", fontSize: 12 },
+  courseSub: { color: "#6b7280", fontSize: 11, marginTop: 2 },
   menuList: { gap: 10, marginBottom: 28 },
   menuItem: {
     backgroundColor: "#1a1f3c",
@@ -299,17 +278,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 14,
   },
-  menuIconText: { fontSize: 20 },
-  menuText: { flex: 1 },
   menuTitle: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 2,
   },
-  menuSubtitle: { color: "#6b7280", fontSize: 12 },
-  menuArrow: { color: "#10b981", fontSize: 24, fontWeight: "300" },
-  logoutButton: {
+  menuSub: { color: "#6b7280", fontSize: 12 },
+  arrow: { fontSize: 24, fontWeight: "300" },
+  logout: {
     borderWidth: 0.5,
     borderColor: "#ef4444",
     borderRadius: 14,

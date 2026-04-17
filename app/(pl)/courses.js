@@ -12,357 +12,277 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { addCourse, getAllCourses } from "../../config/firestore";
+import {
+  addCourse,
+  assignLecturersToCourse,
+  assignStudentsToCourse,
+  getAllCourses,
+  getAllLecturers,
+  getAllStudents,
+} from "../../config/firestore";
 
 export default function PLCourses() {
   const [courses, setCourses] = useState([]);
+  const [lecturers, setLecturers] = useState([]);
+  const [students, setStudents] = useState([]);
+
+  const [selectedLecturers, setSelectedLecturers] = useState([]);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+
   const [newCourse, setNewCourse] = useState({
     courseName: "",
     courseCode: "",
-    lecturerName: "",
     semester: "",
-    totalStudents: "",
   });
 
   useEffect(() => {
     loadCourses();
+    loadUsers();
   }, []);
 
   const loadCourses = async () => {
-    try {
-      const data = await getAllCourses();
-      setCourses(data);
-    } catch (e) {
-      console.log("Error:", e);
-    }
+    const data = await getAllCourses();
+    setCourses(data);
     setLoading(false);
+  };
+
+  const loadUsers = async () => {
+    setLecturers(await getAllLecturers());
+    setStudents(await getAllStudents());
+  };
+
+  const toggleSelect = (id, list, setList) => {
+    setList(list.includes(id) ? list.filter((i) => i !== id) : [...list, id]);
   };
 
   const handleAddCourse = useCallback(async () => {
     if (!newCourse.courseName || !newCourse.courseCode) {
-      Alert.alert("Error", "Course name and code are required");
+      Alert.alert("Error", "Course name & code required");
       return;
     }
+
     setSaving(true);
     try {
-      await addCourse({
+      const ref = await addCourse({
         ...newCourse,
-        totalStudents: parseInt(newCourse.totalStudents) || 0,
         semester: parseInt(newCourse.semester) || 1,
       });
-      Alert.alert("Success", "Course added successfully!");
+
+      await assignLecturersToCourse(ref.id, selectedLecturers);
+      await assignStudentsToCourse(ref.id, selectedStudents);
+
+      Alert.alert("Success", "Course created");
+
       setModalVisible(false);
-      setNewCourse({
-        courseName: "",
-        courseCode: "",
-        lecturerName: "",
-        semester: "",
-        totalStudents: "",
-      });
+      setSelectedLecturers([]);
+      setSelectedStudents([]);
+      setNewCourse({ courseName: "", courseCode: "", semester: "" });
+
       loadCourses();
     } catch (e) {
-      Alert.alert("Error", "Failed to add course");
+      Alert.alert("Error", "Failed");
     }
     setSaving(false);
-  }, [newCourse]);
-
-  const filtered = courses.filter(
-    (c) =>
-      !search ||
-      (c.courseName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.courseCode || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.lecturerName || "").toLowerCase().includes(search.toLowerCase()),
-  );
+  }, [newCourse, selectedLecturers, selectedStudents]);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView style={styles.container}>
+        {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backBtn}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Courses</Text>
+          <Text style={styles.title}>Courses</Text>
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => setModalVisible(true)}
           >
-            <Text style={styles.addBtnText}>+ Add</Text>
+            <Text style={styles.addText}>+ Add</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#4f46e5" }]}>
-              {courses.length}
-            </Text>
-            <Text style={styles.statLabel}>Total Courses</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#10b981" }]}>
-              {courses.reduce(
-                (a, b) => a + (parseInt(b.totalStudents) || 0),
-                0,
-              )}
-            </Text>
-            <Text style={styles.statLabel}>Total Students</Text>
-          </View>
-        </View>
-
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search courses..."
-          placeholderTextColor="#555b7a"
-          value={search}
-          onChangeText={setSearch}
-        />
-
-        <Text style={styles.sectionTitle}>All Courses ({filtered.length})</Text>
+        {/* COURSE LIST */}
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No courses yet. Add one!</Text>
-          </View>
         ) : (
-          filtered.map((course) => (
-            <View key={course.id} style={styles.courseCard}>
-              <View style={styles.courseHeader}>
-                <View style={styles.codeBadge}>
-                  <Text style={styles.codeBadgeText}>{course.courseCode}</Text>
-                </View>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>
-                    {course.status || "Active"}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.courseName}>{course.courseName}</Text>
-              <View style={styles.details}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>👨‍🏫</Text>
-                  <Text style={styles.detailText}>
-                    {course.lecturerName || "TBA"}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>👥</Text>
-                  <Text style={styles.detailText}>
-                    {course.totalStudents || 0} Students
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>📅</Text>
-                  <Text style={styles.detailText}>
-                    Semester {course.semester || "N/A"}
-                  </Text>
-                </View>
-              </View>
+          courses.map((c) => (
+            <View key={c.id} style={styles.card}>
+              <Text style={styles.courseName}>{c.courseName}</Text>
+              <Text style={styles.code}>{c.courseCode}</Text>
             </View>
           ))
         )}
       </ScrollView>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add New Course</Text>
-            {[
-              { key: "courseName", placeholder: "Course Name *" },
-              { key: "courseCode", placeholder: "Course Code *" },
-              { key: "lecturerName", placeholder: "Assign Lecturer" },
-              { key: "semester", placeholder: "Semester", keyboard: "numeric" },
-              {
-                key: "totalStudents",
-                placeholder: "Total Students",
-                keyboard: "numeric",
-              },
-            ].map((field) => (
-              <TextInput
-                key={field.key}
-                style={styles.modalInput}
-                placeholder={field.placeholder}
-                placeholderTextColor="#555b7a"
-                value={newCourse[field.key]}
-                onChangeText={(v) =>
-                  setNewCourse((p) => ({ ...p, [field.key]: v }))
-                }
-                keyboardType={field.keyboard || "default"}
-              />
-            ))}
-            <View style={styles.modalButtons}>
+      {/* MODAL */}
+      <Modal visible={modalVisible} animationType="slide">
+        <SafeAreaView style={styles.modalContainer}>
+          <ScrollView>
+            <Text style={styles.modalTitle}>Create Course</Text>
+
+            {/* COURSE INFO */}
+            <TextInput
+              style={styles.input}
+              placeholder="Course Name"
+              placeholderTextColor="#777"
+              value={newCourse.courseName}
+              onChangeText={(v) =>
+                setNewCourse((p) => ({ ...p, courseName: v }))
+              }
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Course Code"
+              placeholderTextColor="#777"
+              value={newCourse.courseCode}
+              onChangeText={(v) =>
+                setNewCourse((p) => ({ ...p, courseCode: v }))
+              }
+            />
+
+            {/* LECTURERS */}
+            <Text style={styles.section}>Select Lecturers</Text>
+            <View style={styles.box}>
+              {lecturers.map((l) => (
+                <TouchableOpacity
+                  key={l.id}
+                  style={styles.row}
+                  onPress={() =>
+                    toggleSelect(l.id, selectedLecturers, setSelectedLecturers)
+                  }
+                >
+                  <Text style={styles.rowText}>{l.name}</Text>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      selectedLecturers.includes(l.id) && styles.checkboxActive,
+                    ]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* STUDENTS */}
+            <Text style={styles.section}>Select Students</Text>
+            <View style={styles.box}>
+              {students.map((s) => (
+                <TouchableOpacity
+                  key={s.id}
+                  style={styles.row}
+                  onPress={() =>
+                    toggleSelect(s.id, selectedStudents, setSelectedStudents)
+                  }
+                >
+                  <Text style={styles.rowText}>{s.name}</Text>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      selectedStudents.includes(s.id) && styles.checkboxGreen,
+                    ]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* ACTIONS */}
+            <View style={styles.actions}>
               <TouchableOpacity
-                style={styles.cancelBtn}
+                style={styles.cancel}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.submitBtn,
-                  saving && { backgroundColor: "#3730a3" },
-                ]}
-                onPress={handleAddCourse}
-                disabled={saving}
-              >
+
+              <TouchableOpacity style={styles.save} onPress={handleAddCourse}>
                 {saving ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitText}>Add Course</Text>
+                  <Text style={styles.saveText}>Create</Text>
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
 }
 
+/* STYLES */
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
-  container: { flex: 1, padding: 20 },
+  container: { padding: 20 },
+
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 24,
-    marginTop: 16,
-  },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  addBtn: {
-    backgroundColor: "#4f46e5",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  addBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
-  statBox: {
-    flex: 1,
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  statValue: { fontSize: 28, fontWeight: "700" },
-  statLabel: { color: "#6b7280", fontSize: 12, marginTop: 4 },
-  searchInput: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 12,
-    padding: 12,
-    color: "#fff",
     marginBottom: 20,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    fontSize: 14,
   },
-  sectionTitle: {
+  backBtn: { color: "#4f46e5" },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  addBtn: { backgroundColor: "#4f46e5", padding: 10, borderRadius: 10 },
+  addText: { color: "#fff" },
+
+  card: {
+    backgroundColor: "#1a1f3c",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  courseName: { color: "#fff", fontSize: 16 },
+  code: { color: "#aaa" },
+
+  modalContainer: { flex: 1, backgroundColor: "#0a0f2c", padding: 20 },
+  modalTitle: { color: "#fff", fontSize: 20, marginBottom: 15 },
+
+  input: {
+    backgroundColor: "#1a1f3c",
     color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
   },
-  emptyBox: {
+
+  section: { color: "#fff", marginTop: 15, marginBottom: 5 },
+
+  box: {
     backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderRadius: 10,
+    padding: 10,
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
-  courseCard: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  courseHeader: {
+
+  row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    paddingVertical: 10,
   },
-  codeBadge: {
-    backgroundColor: "#4f46e5",
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+  rowText: { color: "#fff" },
+
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: "#555",
+    borderRadius: 4,
   },
-  codeBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  statusBadge: {
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderWidth: 0.5,
-    borderColor: "#10b981",
-  },
-  statusText: { color: "#10b981", fontSize: 12, fontWeight: "600" },
-  courseName: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  details: { gap: 6 },
-  detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  detailIcon: { fontSize: 14 },
-  detailText: { color: "#9ca3af", fontSize: 13 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: "#1a1f3c",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-  },
-  modalTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
-  modalInput: {
-    backgroundColor: "#0a0f2c",
-    borderRadius: 12,
-    padding: 14,
-    color: "#fff",
-    marginBottom: 12,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    fontSize: 14,
-  },
-  modalButtons: { flexDirection: "row", gap: 10, marginTop: 4 },
-  cancelBtn: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  cancelText: { color: "#6b7280", fontSize: 15, fontWeight: "600" },
-  submitBtn: {
+  checkboxActive: { backgroundColor: "#4f46e5" },
+  checkboxGreen: { backgroundColor: "#10b981" },
+
+  actions: { flexDirection: "row", marginTop: 20 },
+  cancel: { flex: 1, alignItems: "center", padding: 12 },
+  cancelText: { color: "#aaa" },
+  save: {
     flex: 1,
     backgroundColor: "#4f46e5",
-    borderRadius: 12,
-    padding: 14,
     alignItems: "center",
+    padding: 12,
+    borderRadius: 10,
   },
-  submitText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  saveText: { color: "#fff" },
 });

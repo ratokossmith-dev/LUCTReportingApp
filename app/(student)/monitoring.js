@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { useAuth } from "../../config/AuthContext";
 import {
+  getClassesByStudent,
   getStudentAttendance,
   getStudentCourses,
 } from "../../config/firestore";
@@ -18,114 +18,180 @@ import {
 export default function StudentMonitoring() {
   const { profile } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
-    loadData();
+    if (!profile?.id) return;
+    (async () => {
+      try {
+        const [c, cl, a] = await Promise.all([
+          getStudentCourses(profile.id),
+          getClassesByStudent(profile.id),
+          getStudentAttendance(profile.id),
+        ]);
+        setCourses(c);
+        setClasses(cl);
+        setAttendance(a);
+      } catch (e) {
+        console.log("Monitoring error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
 
-  const loadData = async () => {
-    try {
-      const [c, a] = await Promise.all([
-        getStudentCourses(profile.id),
-        getStudentAttendance(profile.id),
-      ]);
-      setCourses(c);
-      setAttendance(a);
-    } catch (e) {
-      console.log("Error:", e);
-    }
-    setLoading(false);
-  };
+  const present = attendance.filter((a) => a.present).length;
+  const rate =
+    attendance.length > 0 ? Math.round((present / attendance.length) * 100) : 0;
+  const rateColor = rate >= 90 ? "#10b981" : rate >= 75 ? "#f59e0b" : "#ef4444";
 
-  const presentCount = attendance.filter((a) => a.present).length;
-  const overallRate =
-    attendance.length > 0
-      ? Math.round((presentCount / attendance.length) * 100)
-      : 0;
-
-  const getColor = (val) => {
-    if (val >= 90) return "#10b981";
-    if (val >= 75) return "#f59e0b";
-    return "#ef4444";
-  };
+  const classStats = classes.map((cls) => {
+    const classAtt = attendance.filter((a) => a.classId === cls.id);
+    const classPresent = classAtt.filter((a) => a.present).length;
+    const classRate =
+      classAtt.length > 0
+        ? Math.round((classPresent / classAtt.length) * 100)
+        : 0;
+    return { ...cls, classPresent, classTotalAtt: classAtt.length, classRate };
+  });
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Monitoring</Text>
+          <Text style={s.title}>My Progress</Text>
           <View style={{ width: 50 }} />
         </View>
 
-        <View style={styles.overallCard}>
-          <View style={styles.overallItem}>
-            <Text
-              style={[styles.overallValue, { color: getColor(overallRate) }]}
-            >
-              {overallRate}%
-            </Text>
-            <Text style={styles.overallLabel}>Overall Attendance</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.overallItem}>
-            <Text style={[styles.overallValue, { color: "#4f46e5" }]}>
-              {courses.length}
-            </Text>
-            <Text style={styles.overallLabel}>Courses</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.overallItem}>
-            <Text style={[styles.overallValue, { color: "#f59e0b" }]}>
-              {presentCount}
-            </Text>
-            <Text style={styles.overallLabel}>Present</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Course Progress</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
-        ) : courses.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No courses found</Text>
-          </View>
         ) : (
-          courses.map((course, index) => (
-            <View key={course.id || index} style={styles.courseCard}>
-              <View style={styles.courseHeader}>
-                <View style={styles.codeBadge}>
-                  <Text style={styles.codeBadgeText}>
-                    {course.courseCode || course.code || "N/A"}
-                  </Text>
-                </View>
+          <>
+            <View style={s.grid}>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: rateColor }]}>{rate}%</Text>
+                <Text style={s.statLabel}>Overall Attendance</Text>
               </View>
-              <Text style={styles.courseName}>
-                {course.courseName || course.name}
-              </Text>
-              <Text style={styles.courseLecturer}>
-                {course.lecturerName || "TBA"}
-              </Text>
-              <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>Status</Text>
-                <Text style={[styles.progressValue, { color: "#10b981" }]}>
-                  {course.status || "Active"}
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#4f46e5" }]}>
+                  {courses.length}
                 </Text>
+                <Text style={s.statLabel}>Enrolled Courses</Text>
+              </View>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#f59e0b" }]}>
+                  {classes.length}
+                </Text>
+                <Text style={s.statLabel}>Classes</Text>
+              </View>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#10b981" }]}>{present}</Text>
+                <Text style={s.statLabel}>Sessions Attended</Text>
               </View>
             </View>
-          ))
+
+            <Text style={s.section}>My Classes & Attendance</Text>
+            {classStats.length === 0 ? (
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>🏫</Text>
+                <Text style={s.emptyTitle}>No classes yet</Text>
+                <Text style={s.emptyText}>
+                  You will be enrolled automatically when a lecturer creates a
+                  class.
+                </Text>
+              </View>
+            ) : (
+              classStats.map((cls) => {
+                const color =
+                  cls.classRate >= 90
+                    ? "#10b981"
+                    : cls.classRate >= 75
+                      ? "#f59e0b"
+                      : "#ef4444";
+                return (
+                  <View key={cls.id} style={s.classCard}>
+                    <View style={s.classHeader}>
+                      <View style={s.classBadge}>
+                        <Text style={s.classBadgeText}>{cls.className}</Text>
+                      </View>
+                      <Text style={[s.classRate, { color }]}>
+                        {cls.classRate}%
+                      </Text>
+                    </View>
+                    <Text style={s.courseName}>{cls.courseName}</Text>
+                    <Text style={s.lecturerName}>
+                      👨‍🏫 {cls.lecturerName || "TBA"}
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginBottom: 10,
+                      }}
+                    >
+                      {cls.day ? (
+                        <Text style={s.detail}>📅 {cls.day}</Text>
+                      ) : null}
+                      {cls.scheduledTime ? (
+                        <Text style={s.detail}>🕐 {cls.scheduledTime}</Text>
+                      ) : null}
+                      {cls.venue ? (
+                        <Text style={s.detail}>📍 {cls.venue}</Text>
+                      ) : null}
+                    </View>
+                    <View style={s.progressBar}>
+                      <View
+                        style={[
+                          s.progressFill,
+                          {
+                            width: `${cls.classRate}%`,
+                            backgroundColor: color,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={s.attStat}>
+                      {cls.classPresent}/{cls.classTotalAtt} sessions attended
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+
+            <Text style={s.section}>Enrolled Courses</Text>
+            {courses.length === 0 ? (
+              <View style={s.empty}>
+                <Text style={s.emptyText}>No courses enrolled yet.</Text>
+              </View>
+            ) : (
+              courses.map((c, i) => (
+                <View key={c.id || i} style={s.courseCard}>
+                  <View style={s.courseCodeBadge}>
+                    <Text style={s.courseCodeText}>
+                      {c.courseCode || "N/A"}
+                    </Text>
+                  </View>
+                  <Text style={s.courseCardName}>{c.courseName || "N/A"}</Text>
+                  <Text style={s.courseCardSub}>
+                    Lecturer: {c.lecturerName || "TBA"} • Semester{" "}
+                    {c.semester || "N/A"}
+                  </Text>
+                </View>
+              ))
+            )}
+          </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 20 },
   header: {
@@ -135,68 +201,104 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  overallCard: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    flexDirection: "row",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  overallItem: { flex: 1, alignItems: "center" },
-  overallValue: { fontSize: 24, fontWeight: "700", marginBottom: 4 },
-  overallLabel: { color: "#6b7280", fontSize: 11, textAlign: "center" },
-  divider: { width: 0.5, backgroundColor: "#2a2f5c", marginHorizontal: 8 },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  emptyBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  emptyText: { color: "#6b7280", fontSize: 14 },
-  courseCard: {
+  back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
+  statCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
     padding: 16,
-    marginBottom: 12,
+    width: "47%",
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  courseHeader: {
+  statVal: { fontSize: 26, fontWeight: "700", marginBottom: 4 },
+  statLabel: { color: "#6b7280", fontSize: 11 },
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  empty: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 14,
+    padding: 28,
+    alignItems: "center",
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+    marginBottom: 16,
+  },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  emptyText: { color: "#6b7280", fontSize: 12, textAlign: "center" },
+  classCard: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+  },
+  classHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
-  codeBadge: {
+  classBadge: {
     backgroundColor: "#4f46e5",
     borderRadius: 8,
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
-  codeBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  classBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  classRate: { fontSize: 18, fontWeight: "700" },
   courseName: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  courseLecturer: { color: "#6b7280", fontSize: 12, marginBottom: 12 },
-  progressRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  lecturerName: { color: "#6b7280", fontSize: 12, marginBottom: 8 },
+  detail: {
+    color: "#9ca3af",
+    fontSize: 11,
+    backgroundColor: "#0a0f2c",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: "#0a0f2c",
+    borderRadius: 3,
     marginBottom: 6,
   },
-  progressLabel: { color: "#9ca3af", fontSize: 12 },
-  progressValue: { fontSize: 12, fontWeight: "600" },
+  progressFill: { height: 6, borderRadius: 3 },
+  attStat: { color: "#6b7280", fontSize: 11 },
+  courseCard: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+  },
+  courseCodeBadge: {
+    backgroundColor: "#4f46e5",
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "flex-start",
+    marginBottom: 8,
+  },
+  courseCodeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  courseCardName: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  courseCardSub: { color: "#6b7280", fontSize: 12 },
 });

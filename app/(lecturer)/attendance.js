@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,75 +12,73 @@ import {
 } from "react-native";
 import { useAuth } from "../../config/AuthContext";
 import {
-  getAllStudents,
-  getAttendanceByClass,
   getClassesByLecturer,
+  getEnrollmentsByClass,
   saveAttendance,
 } from "../../config/firestore";
 
-export default function AttendanceScreen() {
+export default function LecturerAttendance() {
   const { profile } = useAuth();
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
   const [attendance, setAttendance] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadingStudents, setLoadingStudents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const date = new Date().toLocaleDateString();
+  const date = new Date().toLocaleDateString("en-GB");
 
   useEffect(() => {
-    if (!profile) return;
-    loadClasses();
+    if (!profile?.id) return;
+    (async () => {
+      try {
+        const c = await getClassesByLecturer(profile.id);
+        setClasses(c);
+      } catch (e) {
+        console.log("Attendance load error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
 
-  // Load lecturer's classes and students for the first class
-  const loadClasses = async () => {
+  const handleClassSelect = async (cls) => {
+    setSelectedClass(cls);
+    setStudents([]);
+    setAttendance({});
+    setSearch("");
+    setLoadingStudents(true);
     try {
-      const c = await getClassesByLecturer(profile.id);
-      setClasses(c);
-      if (c.length > 0) {
-        setSelectedClass(c[0]);
-        loadAttendance(c[0].id);
-      }
-    } catch (e) {
-      console.log("Error loading classes:", e);
-    }
-    setLoading(false);
-  };
+      const enrollments = await getEnrollmentsByClass(cls.id);
+      if (enrollments.length > 0) {
+        const enrolled = enrollments
+          .map((e) => ({
+            id: e.studentId,
+            name: e.studentName || "Unknown",
+            email: e.studentEmail || "",
+          }))
+          .filter((s) => s.id);
+        setStudents(enrolled);
 
-  // Load attendance for a class
-  const loadAttendance = async (classId) => {
-    try {
-      const attRecords = await getAttendanceByClass(classId);
-
-      // Build students array and attendance map
-      const studentsMap = {};
-      attRecords.forEach((rec) => {
-        studentsMap[rec.studentId] = rec.present;
-      });
-
-      // If attendance records exist, use them; otherwise fetch all students
-      if (attRecords.length > 0) {
-        const studentIds = attRecords.map((a) => a.studentId);
-        const allStudents = await getAllStudents();
-        const filteredStudents = allStudents.filter((s) =>
-          studentIds.includes(s.id),
-        );
-        setStudents(filteredStudents);
-        setAttendance(studentsMap);
-      } else {
-        const allStudents = await getAllStudents();
-        setStudents(allStudents);
+        // Initialize attendance as all false (absent)
         const initialAttendance = {};
-        allStudents.forEach((s) => (initialAttendance[s.id] = false));
+        enrolled.forEach((st) => {
+          initialAttendance[st.id] = false;
+        });
         setAttendance(initialAttendance);
+      } else {
+        setStudents([]);
+        setAttendance({});
       }
     } catch (e) {
-      console.log("Error loading attendance:", e);
+      console.log("Load enrolled students error:", e);
+      setStudents([]);
+      setAttendance({});
     }
+    setLoadingStudents(false);
   };
 
+  // FIXED: Toggle function that properly updates attendance
   const toggleAttendance = useCallback((studentId) => {
     setAttendance((prev) => ({
       ...prev,
@@ -89,10 +86,10 @@ export default function AttendanceScreen() {
     }));
   }, []);
 
-  const markAll = (present) => {
+  const markAll = (value) => {
     const newAttendance = {};
-    students.forEach((s) => {
-      newAttendance[s.id] = present;
+    students.forEach((st) => {
+      newAttendance[st.id] = value;
     });
     setAttendance(newAttendance);
   };
@@ -102,222 +99,270 @@ export default function AttendanceScreen() {
       Alert.alert("Error", "Please select a class");
       return;
     }
+    if (students.length === 0) {
+      Alert.alert("Error", "No students enrolled in this class");
+      return;
+    }
+
     setSaving(true);
     try {
-      const attendanceRecords = students.map((student) => ({
-        studentId: student.id,
-        studentName: student.name,
-        classId: selectedClass.id,
-        className: selectedClass.className,
-        courseName: selectedClass.courseName,
-        courseCode: selectedClass.courseCode,
-        lecturerId: profile.id,
-        lecturerName: profile.name,
-        present: attendance[student.id] || false,
-        date,
-      }));
+      // Save attendance for each student
+      for (const st of students) {
+        const isPresent = attendance[st.id] || false;
+        await saveAttendance({
+          studentId: st.id,
+          studentName: st.name,
+          classId: selectedClass.id,
+          className: selectedClass.className,
+          courseName: selectedClass.courseName,
+          courseCode: selectedClass.courseCode,
+          lecturerId: profile.id,
+          lecturerName: profile.name,
+          present: isPresent,
+          date,
+        });
+      }
 
-      await Promise.all(
-        attendanceRecords.map((record) => saveAttendance(record)),
+      const presentCount = Object.values(attendance).filter(Boolean).length;
+      Alert.alert(
+        "Success! ✅",
+        `Attendance saved for ${students.length} students.\n\nPresent: ${presentCount}\nAbsent: ${students.length - presentCount}`,
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Reset attendance after save
+              const resetAttendance = {};
+              students.forEach((st) => {
+                resetAttendance[st.id] = false;
+              });
+              setAttendance(resetAttendance);
+            },
+          },
+        ],
       );
-
-      Alert.alert("Success", "Attendance saved successfully!");
-      setAttendance({});
-      loadAttendance(selectedClass.id); // reload after saving
     } catch (e) {
-      console.log("Error saving attendance:", e);
-      Alert.alert("Error", "Failed to save attendance");
+      console.log("Save error:", e);
+      Alert.alert("Error", "Failed to save attendance: " + e.message);
     }
     setSaving(false);
   };
 
   const presentCount = Object.values(attendance).filter(Boolean).length;
   const filteredStudents = students.filter(
-    (s) =>
+    (st) =>
       !search ||
-      s.name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.email?.toLowerCase().includes(search.toLowerCase()),
+      (st.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (st.email || "").toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={s.safe}>
       <ScrollView
-        style={styles.container}
+        style={s.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View style={styles.header}>
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Attendance</Text>
+          <Text style={s.title}>Mark Attendance</Text>
           <View style={{ width: 50 }} />
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#10b981" }]}>
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
+            <Text style={[s.statVal, { color: "#10b981" }]}>
               {presentCount}
             </Text>
-            <Text style={styles.statLabel}>Present</Text>
+            <Text style={s.statLabel}>Present</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#ef4444" }]}>
+          <View style={s.statBox}>
+            <Text style={[s.statVal, { color: "#ef4444" }]}>
               {students.length - presentCount}
             </Text>
-            <Text style={styles.statLabel}>Absent</Text>
+            <Text style={s.statLabel}>Absent</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#4f46e5" }]}>
-              {students.length > 0
-                ? Math.round((presentCount / students.length) * 100)
-                : 0}
-              %
+          <View style={s.statBox}>
+            <Text style={[s.statVal, { color: "#4f46e5" }]}>
+              {students.length}
             </Text>
-            <Text style={styles.statLabel}>Rate</Text>
+            <Text style={s.statLabel}>Total</Text>
           </View>
         </View>
 
-        {/* Class Selection */}
-        <Text style={styles.sectionTitle}>Select Class</Text>
+        <Text style={s.section}>1. Select Class</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
         ) : classes.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No classes found</Text>
+          <View style={s.empty}>
+            <Text style={s.emptyText}>
+              No classes found. Add a class first.
+            </Text>
           </View>
         ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.classScroll}
+            style={{ marginBottom: 16 }}
           >
             {classes.map((cls) => (
               <TouchableOpacity
                 key={cls.id}
                 style={[
-                  styles.classBtn,
-                  selectedClass?.id === cls.id && styles.classBtnActive,
+                  s.classBtn,
+                  selectedClass?.id === cls.id && s.classBtnActive,
                 ]}
-                onPress={() => {
-                  setSelectedClass(cls);
-                  loadAttendance(cls.id);
-                }}
+                onPress={() => handleClassSelect(cls)}
               >
                 <Text
                   style={[
-                    styles.classText,
-                    selectedClass?.id === cls.id && styles.classTextActive,
+                    s.classText,
+                    selectedClass?.id === cls.id && s.classTextActive,
                   ]}
                 >
                   {cls.className}
+                </Text>
+                <Text
+                  style={[
+                    s.classSub,
+                    selectedClass?.id === cls.id && {
+                      color: "rgba(255,255,255,0.7)",
+                    },
+                  ]}
+                >
+                  {cls.day}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         )}
 
-        {/* Date */}
-        <View style={styles.dateBox}>
-          <Text style={styles.dateLabel}>📅 Date</Text>
-          <Text style={styles.dateValue}>{date}</Text>
-        </View>
-
-        {/* Search */}
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search students..."
-          placeholderTextColor="#555b7a"
-          value={search}
-          onChangeText={setSearch}
-        />
-
-        {/* Mark All */}
-        <View style={styles.markAllRow}>
-          <TouchableOpacity
-            style={styles.markAllBtn}
-            onPress={() => markAll(true)}
-          >
-            <Text style={styles.markAllText}>✓ Mark All Present</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.markAllBtn, styles.markAllAbsent]}
-            onPress={() => markAll(false)}
-          >
-            <Text style={[styles.markAllText, { color: "#ef4444" }]}>
-              ✗ Mark All Absent
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Students */}
-        <Text style={styles.sectionTitle}>
-          Students ({filteredStudents.length})
-        </Text>
-        {filteredStudents.map((student) => (
-          <TouchableOpacity
-            key={student.id}
-            style={[
-              styles.studentCard,
-              attendance[student.id] && styles.studentCardPresent,
-            ]}
-            onPress={() => toggleAttendance(student.id)}
-          >
-            <View style={styles.studentInfo}>
-              <View
-                style={[
-                  styles.studentAvatar,
-                  attendance[student.id] && styles.studentAvatarPresent,
-                ]}
-              >
-                <Text style={styles.studentAvatarText}>
-                  {student.name?.charAt(0) || "S"}
-                </Text>
-              </View>
-              <View>
-                <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentEmail}>{student.email}</Text>
-              </View>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                attendance[student.id] && styles.statusBadgePresent,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusText,
-                  attendance[student.id] && styles.statusTextPresent,
-                ]}
-              >
-                {attendance[student.id] ? "✓ Present" : "✗ Absent"}
+        {selectedClass && (
+          <>
+            <View style={s.dateBox}>
+              <Text style={s.dateLabel}>📅 Date: {date}</Text>
+              <Text style={s.classInfo}>
+                {selectedClass.className} • {selectedClass.courseName}
               </Text>
             </View>
-          </TouchableOpacity>
-        ))}
 
-        {/* Save */}
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveText}>Save Attendance</Text>
-          )}
-        </TouchableOpacity>
+            <Text style={s.section}>2. Mark Students (Tap to toggle)</Text>
+
+            {loadingStudents ? (
+              <View style={s.loadingBox}>
+                <ActivityIndicator color="#4f46e5" />
+                <Text style={s.loadingText}>Loading enrolled students...</Text>
+              </View>
+            ) : students.length === 0 ? (
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>👥</Text>
+                <Text style={s.emptyTitle}>No students enrolled yet</Text>
+                <Text style={s.emptyText}>
+                  Students will be automatically enrolled when they register.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  style={s.input}
+                  placeholder="Search students..."
+                  placeholderTextColor="#555b7a"
+                  value={search}
+                  onChangeText={setSearch}
+                />
+
+                <View style={s.markAllRow}>
+                  <TouchableOpacity
+                    style={s.markAllBtn}
+                    onPress={() => markAll(true)}
+                  >
+                    <Text style={s.markAllText}>✓ Mark All Present</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.markAllBtn, s.markAllAbsent]}
+                    onPress={() => markAll(false)}
+                  >
+                    <Text style={[s.markAllText, { color: "#ef4444" }]}>
+                      ✗ Mark All Absent
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={s.studentCount}>
+                  {filteredStudents.length} students enrolled
+                </Text>
+
+                {filteredStudents.map((st) => (
+                  <TouchableOpacity
+                    key={st.id}
+                    style={[
+                      s.studentCard,
+                      attendance[st.id] === true && s.studentCardPresent,
+                    ]}
+                    onPress={() => toggleAttendance(st.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={[
+                        s.avatar,
+                        attendance[st.id] === true && s.avatarPresent,
+                      ]}
+                    >
+                      <Text style={s.avatarText}>
+                        {st.name?.charAt(0)?.toUpperCase() || "S"}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.studentName}>{st.name}</Text>
+                      <Text style={s.studentEmail}>{st.email}</Text>
+                    </View>
+                    <View
+                      style={[
+                        s.badge,
+                        attendance[st.id] === true
+                          ? s.badgePresent
+                          : s.badgeAbsent,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          s.badgeText,
+                          attendance[st.id] === true
+                            ? s.textPresent
+                            : s.textAbsent,
+                        ]}
+                      >
+                        {attendance[st.id] === true ? "✓ Present" : "✗ Absent"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  style={[s.saveBtn, saving && s.saveBtnDisabled]}
+                  onPress={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={s.saveBtnText}>
+                      Save Attendance ({presentCount}/{students.length})
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-// Keep your existing styles
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 20 },
   header: {
@@ -327,8 +372,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
   statBox: {
     flex: 1,
@@ -339,15 +384,57 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 24, fontWeight: "700" },
+  statVal: { fontSize: 24, fontWeight: "700" },
   statLabel: { color: "#6b7280", fontSize: 11, marginTop: 4 },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  empty: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 14,
+    padding: 28,
+    alignItems: "center",
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+    marginBottom: 16,
   },
-  emptyBox: {
+  emptyIcon: { fontSize: 32, marginBottom: 8 },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  emptyText: {
+    color: "#6b7280",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  classBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+    marginRight: 10,
+    backgroundColor: "#1a1f3c",
+    minWidth: 80,
+    alignItems: "center",
+  },
+  classBtnActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
+  classText: { color: "#6b7280", fontSize: 13, fontWeight: "600" },
+  classTextActive: { color: "#fff" },
+  classSub: { color: "#6b7280", fontSize: 10, marginTop: 2 },
+  dateBox: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+  },
+  dateLabel: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  classInfo: { color: "#6b7280", fontSize: 12, marginTop: 4 },
+  loadingBox: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
     padding: 24,
@@ -355,34 +442,10 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
     marginBottom: 16,
+    gap: 12,
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
-  classScroll: { marginBottom: 16 },
-  classBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    marginRight: 8,
-    backgroundColor: "#1a1f3c",
-  },
-  classBtnActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
-  classText: { color: "#6b7280", fontSize: 13, fontWeight: "500" },
-  classTextActive: { color: "#fff" },
-  dateBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 14,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  dateLabel: { color: "#6b7280", fontSize: 14 },
-  dateValue: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  searchInput: {
+  loadingText: { color: "#6b7280", fontSize: 13 },
+  input: {
     backgroundColor: "#1a1f3c",
     borderRadius: 12,
     padding: 12,
@@ -392,7 +455,7 @@ const styles = StyleSheet.create({
     borderColor: "#2a2f5c",
     fontSize: 14,
   },
-  markAllRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  markAllRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
   markAllBtn: {
     flex: 1,
     backgroundColor: "#1a1f3c",
@@ -404,6 +467,7 @@ const styles = StyleSheet.create({
   },
   markAllAbsent: { borderColor: "#ef4444" },
   markAllText: { color: "#10b981", fontSize: 13, fontWeight: "600" },
+  studentCount: { color: "#6b7280", fontSize: 12, marginBottom: 10 },
   studentCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
@@ -415,34 +479,39 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  studentCardPresent: { borderColor: "#10b981" },
-  studentInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
-  studentAvatar: {
+  studentCardPresent: { borderColor: "#10b981", backgroundColor: "#1a2a1f" },
+  avatar: {
     width: 40,
     height: 40,
-    backgroundColor: "#0a0f2c",
+    backgroundColor: "#2a2f5c",
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    marginRight: 12,
   },
-  studentAvatarPresent: { backgroundColor: "#10b981", borderColor: "#10b981" },
-  studentAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  avatarPresent: { backgroundColor: "#10b981" },
+  avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   studentName: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  studentEmail: { color: "#6b7280", fontSize: 12 },
-  statusBadge: {
+  studentEmail: { color: "#6b7280", fontSize: 11, marginTop: 2 },
+  badge: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: "#0a0f2c",
     borderWidth: 0.5,
-    borderColor: "#ef4444",
+    alignItems: "center",
   },
-  statusBadgePresent: { borderColor: "#10b981" },
-  statusText: { color: "#ef4444", fontSize: 12, fontWeight: "600" },
-  statusTextPresent: { color: "#10b981" },
-  saveButton: {
+  badgePresent: {
+    borderColor: "#10b981",
+    backgroundColor: "rgba(16,185,129,0.1)",
+  },
+  badgeAbsent: {
+    borderColor: "#ef4444",
+    backgroundColor: "rgba(239,68,68,0.05)",
+  },
+  badgeText: { fontSize: 12, fontWeight: "600" },
+  textPresent: { color: "#10b981" },
+  textAbsent: { color: "#ef4444" },
+  saveBtn: {
     backgroundColor: "#4f46e5",
     borderRadius: 14,
     padding: 16,
@@ -450,6 +519,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     marginTop: 8,
   },
-  saveButtonDisabled: { backgroundColor: "#3730a3" },
-  saveText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  saveBtnDisabled: { backgroundColor: "#3730a3" },
+  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

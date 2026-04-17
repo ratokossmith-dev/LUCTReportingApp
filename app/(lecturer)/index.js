@@ -3,7 +3,6 @@ import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import { auth } from "../../config/auth";
 import { useAuth } from "../../config/AuthContext";
 import {
   getClassesByLecturer,
+  getCoursesByLecturer,
   getRatingsByLecturer,
   getReportsByLecturer,
 } from "../../config/firestore";
@@ -23,56 +23,39 @@ export default function LecturerDashboard() {
   const [stats, setStats] = useState({
     reports: 0,
     classes: 0,
-    attendance: 0,
+    courses: 0,
     rating: "N/A",
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
-    loadStats();
+    if (!profile?.id) return;
+    (async () => {
+      try {
+        const [reports, classes, ratings, courses] = await Promise.all([
+          getReportsByLecturer(profile.id),
+          getClassesByLecturer(profile.id),
+          getRatingsByLecturer(profile.id),
+          getCoursesByLecturer(profile.id),
+        ]);
+        const avg =
+          ratings.length > 0
+            ? (
+                ratings.reduce((a, b) => a + b.rating, 0) / ratings.length
+              ).toFixed(1)
+            : "N/A";
+        setStats({
+          reports: reports.length,
+          classes: classes.length,
+          courses: courses.length,
+          rating: avg,
+        });
+      } catch (e) {
+        console.log("Lecturer dashboard error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
-
-  const loadStats = async () => {
-    try {
-      const [reports, classes, ratings] = await Promise.all([
-        getReportsByLecturer(profile.id),
-        getClassesByLecturer(profile.id),
-        getRatingsByLecturer(profile.id),
-      ]);
-      const avgRating =
-        ratings.length > 0
-          ? (
-              ratings.reduce((a, b) => a + b.rating, 0) / ratings.length
-            ).toFixed(1)
-          : "N/A";
-      const avgAttendance =
-        reports.length > 0
-          ? Math.round(
-              reports.reduce(
-                (a, b) =>
-                  a +
-                  (b.actualStudentsPresent / b.totalRegisteredStudents) * 100,
-                0,
-              ) / reports.length,
-            )
-          : 0;
-      setStats({
-        reports: reports.length,
-        classes: classes.length,
-        attendance: avgAttendance,
-        rating: avgRating,
-      });
-    } catch (e) {
-      console.log("Error loading stats:", e);
-    }
-    setLoading(false);
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/(auth)/login");
-  };
 
   const initials = profile?.name
     ? profile.name
@@ -83,121 +66,133 @@ export default function LecturerDashboard() {
         .slice(0, 2)
     : "LR";
 
-  const menuItems = [
-    {
-      icon: "📋",
-      title: "Submit Report",
-      subtitle: "Add lecture report",
-      route: "/(lecturer)/report",
-    },
+  const menu = [
     {
       icon: "🏫",
       title: "My Classes",
-      subtitle: "View assigned classes",
+      sub: "View & add classes under your courses",
       route: "/(lecturer)/classes",
     },
     {
       icon: "👥",
-      title: "Attendance",
-      subtitle: "Mark student attendance",
+      title: "Mark Attendance",
+      sub: "Mark attendance for enrolled students",
       route: "/(lecturer)/attendance",
+    },
+    {
+      icon: "📋",
+      title: "Submit Report",
+      sub: "Submit weekly lecture report",
+      route: "/(lecturer)/report",
     },
     {
       icon: "📊",
       title: "Monitoring",
-      subtitle: "View your performance",
+      sub: "View reports & PRL feedback",
       route: "/(lecturer)/monitoring",
     },
     {
       icon: "⭐",
       title: "My Ratings",
-      subtitle: "See student feedback",
+      sub: "See student feedback & ratings",
       route: "/(lecturer)/ratings",
     },
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.greeting}>Welcome back 👋</Text>
-            <Text style={styles.name}>{profile?.name || "Lecturer"}</Text>
-            <Text style={styles.faculty}>
-              {profile?.facultyName || "Faculty of ICT"}
+            <Text style={s.greeting}>Welcome back 👋</Text>
+            <Text style={s.name}>{profile?.name || "Lecturer"}</Text>
+            <Text style={s.role}>
+              Lecturer • {profile?.facultyName || "Faculty of ICT"}
             </Text>
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{initials}</Text>
           </View>
         </View>
-
-        <Text style={styles.sectionTitle}>Overview</Text>
+        <Text style={s.section}>Overview</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" style={{ marginBottom: 28 }} />
         ) : (
-          <View style={styles.statsGrid}>
-            {[
-              { label: "Reports", value: stats.reports, color: "#4f46e5" },
-              { label: "Classes", value: stats.classes, color: "#10b981" },
-              {
-                label: "Attendance",
-                value: `${stats.attendance}%`,
-                color: "#f59e0b",
-              },
-              { label: "Rating", value: stats.rating, color: "#ec4899" },
-            ].map((stat, i) => (
-              <View key={i} style={styles.statCard}>
-                <Text style={[styles.statValue, { color: stat.color }]}>
-                  {stat.value}
-                </Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
+          <View style={s.grid}>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#10b981" }]}>
+                {stats.courses}
+              </Text>
+              <Text style={s.statLabel}>My Courses</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#4f46e5" }]}>
+                {stats.classes}
+              </Text>
+              <Text style={s.statLabel}>My Classes</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#f59e0b" }]}>
+                {stats.reports}
+              </Text>
+              <Text style={s.statLabel}>Reports Submitted</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#ec4899" }]}>
+                {stats.rating}
+              </Text>
+              <Text style={s.statLabel}>Avg Rating</Text>
+            </View>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.menuList}>
-          {menuItems.map((item, index) => (
+        <Text style={s.section}>Quick Actions</Text>
+        <View style={s.menuList}>
+          {menu.map((item, i) => (
             <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
+              key={i}
+              style={s.menuItem}
               onPress={() => router.push(item.route)}
             >
-              <View style={styles.menuIcon}>
-                <Text style={styles.menuIconText}>{item.icon}</Text>
+              <View style={s.menuIcon}>
+                <Text style={{ fontSize: 20 }}>{item.icon}</Text>
               </View>
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.menuTitle}>{item.title}</Text>
+                <Text style={s.menuSub}>{item.sub}</Text>
               </View>
-              <Text style={styles.menuArrow}>›</Text>
+              <Text style={s.arrow}>›</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity
+          style={s.logout}
+          onPress={async () => {
+            await signOut(auth);
+            router.replace("/(auth)/login");
+          }}
+        >
+          <Text style={s.logoutText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 24 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 20,
     marginTop: 16,
   },
   greeting: { color: "#6b7280", fontSize: 14, marginBottom: 4 },
   name: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 2 },
-  faculty: { color: "#4f46e5", fontSize: 12 },
+  role: { color: "#4f46e5", fontSize: 12 },
   avatar: {
     width: 50,
     height: 50,
@@ -207,18 +202,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 14,
+  noticeBox: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#4f46e5",
+    marginBottom: 24,
   },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 28,
-  },
+  noticeText: { color: "#9ca3af", fontSize: 12, lineHeight: 18 },
+  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 14 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   statCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
@@ -227,8 +221,8 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
-  statLabel: { color: "#6b7280", fontSize: 12 },
+  statVal: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
+  statLabel: { color: "#6b7280", fontSize: 11 },
   menuList: { gap: 10, marginBottom: 28 },
   menuItem: {
     backgroundColor: "#1a1f3c",
@@ -248,17 +242,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 14,
   },
-  menuIconText: { fontSize: 20 },
-  menuText: { flex: 1 },
   menuTitle: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 2,
   },
-  menuSubtitle: { color: "#6b7280", fontSize: 12 },
-  menuArrow: { color: "#4f46e5", fontSize: 24, fontWeight: "300" },
-  logoutButton: {
+  menuSub: { color: "#6b7280", fontSize: 11 },
+  arrow: { color: "#4f46e5", fontSize: 24, fontWeight: "300" },
+  logout: {
     borderWidth: 0.5,
     borderColor: "#ef4444",
     borderRadius: 14,

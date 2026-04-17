@@ -12,80 +12,112 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View } from "react-native";
+  View,
+} from "react-native";
 import { auth } from "../../config/auth";
 import { db } from "../../config/firebase";
+import { enrollNewStudentInAllClasses } from "../../config/firestore";
+
+const ROLES = [
+  {
+    key: "student",
+    label: "Student",
+    color: "#10b981",
+    desc: "View classes, attendance & rate lecturers",
+  },
+  {
+    key: "lecturer",
+    label: "Lecturer",
+    color: "#4f46e5",
+    desc: "Add classes, mark attendance & submit reports",
+  },
+  {
+    key: "prl",
+    label: "Principal Lecturer",
+    color: "#f59e0b",
+    desc: "Review reports & give feedback to lecturers",
+  },
+  {
+    key: "pl",
+    label: "Program Leader",
+    color: "#ec4899",
+    desc: "Manage courses, assign lecturers & full overview",
+  },
+];
 
 export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [role, setRole] = useState("student");
   const [loading, setLoading] = useState(false);
 
-  const roles = [
-    { key: "student", label: "Student" },
-    { key: "lecturer", label: "Lecturer" },
-    { key: "prl", label: "Principal Lecturer" },
-    { key: "pl", label: "Program Leader" },
-  ];
-
   const handleRegister = useCallback(async () => {
     if (!name.trim()) {
-      Alert.alert("Validation Error", "Please enter your full name");
+      Alert.alert("Error", "Please enter your full name");
       return;
     }
-    if (!email.trim()) {
-      Alert.alert("Validation Error", "Please enter your email");
-      return;
-    }
-    if (!email.includes("@")) {
-      Alert.alert("Validation Error", "Please enter a valid email address");
-      return;
-    }
-    if (!password.trim()) {
-      Alert.alert("Validation Error", "Please enter a password");
+    if (!email.trim() || !email.includes("@")) {
+      Alert.alert("Error", "Please enter a valid email");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Validation Error", "Password must be at least 6 characters");
+      Alert.alert("Error", "Password must be at least 6 characters");
       return;
     }
-    if (password !== confirmPassword) {
-      Alert.alert("Validation Error", "Passwords do not match");
+    if (password !== confirm) {
+      Alert.alert("Error", "Passwords do not match");
       return;
     }
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
+      const cred = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
         password,
       );
-      await setDoc(doc(db, "users", userCredential.user.uid), {
+      const uid = cred.user.uid;
+      await setDoc(doc(db, "users", uid), {
         name: name.trim(),
         email: email.trim(),
         role,
         facultyName: "Faculty of ICT",
-        createdAt: new Date() });
+        createdAt: new Date(),
+      });
+      if (role === "student") {
+        try {
+          await enrollNewStudentInAllClasses(uid, name.trim(), email.trim());
+        } catch (e) {
+          console.log("Auto-enroll error (non-critical):", e);
+        }
+      }
+      const roleLabel = ROLES.find((r) => r.key === role)?.label || role;
       Alert.alert(
-        "Account Created!",
-        `Welcome ${name.trim()}! Your account has been created successfully.`,
-        [{ text: "Login Now", onPress: () => router.replace("/(auth)/login") }],
+        "Account Created! ✅",
+        `Welcome ${name.trim()}!\n\nRole: ${roleLabel}\n\nYou can now login with your email and password.`,
+        [
+          {
+            text: "Go to Login",
+            onPress: () => router.replace("/(auth)/login"),
+          },
+        ],
       );
     } catch (error) {
-      let message = "Registration failed. Please try again.";
+      console.log("Register error:", error.code, error.message);
+      let msg = "Registration failed. Please try again.";
       if (error.code === "auth/email-already-in-use")
-        message = "This email is already registered. Please login instead.";
+        msg = "This email is already registered. Please login.";
       else if (error.code === "auth/invalid-email")
-        message = "Please enter a valid email address.";
+        msg = "Invalid email address.";
       else if (error.code === "auth/weak-password")
-        message = "Password is too weak. Use at least 6 characters.";
-      Alert.alert("Registration Failed", message);
+        msg = "Password is too weak. Use at least 6 characters.";
+      else if (error.code === "auth/network-request-failed")
+        msg = "No internet connection.";
+      Alert.alert("Registration Failed", msg);
     }
     setLoading(false);
-  }, [name, email, password, confirmPassword, role]);
+  }, [name, email, password, confirm, role]);
 
   return (
     <KeyboardAvoidingView
@@ -93,30 +125,28 @@ export default function RegisterScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={s.container}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoBox}>
-          <Text style={styles.logoText}>L</Text>
+        <View style={s.logoBox}>
+          <Text style={s.logoText}>L</Text>
         </View>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join LUCT Reporting System</Text>
+        <Text style={s.title}>Create Account</Text>
+        <Text style={s.subtitle}>LUCT Faculty of ICT Reporting System</Text>
 
-        <Text style={styles.label}>Full Name *</Text>
+        <Text style={s.label}>Full Name *</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Enter your full name"
           placeholderTextColor="#555b7a"
           value={name}
           onChangeText={setName}
           autoCorrect={false}
-          returnKeyType="next"
-          blurOnSubmit={false}
         />
 
-        <Text style={styles.label}>Email Address *</Text>
+        <Text style={s.label}>Email Address *</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Enter your email"
           placeholderTextColor="#555b7a"
           value={email}
@@ -124,80 +154,93 @@ export default function RegisterScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
-          returnKeyType="next"
-          blurOnSubmit={false}
         />
 
-        <Text style={styles.label}>Password * (min 6 characters)</Text>
+        <Text style={s.label}>Password * (min 6 characters)</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Create a password"
           placeholderTextColor="#555b7a"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          returnKeyType="next"
-          blurOnSubmit={false}
         />
 
-        <Text style={styles.label}>Confirm Password *</Text>
+        <Text style={s.label}>Confirm Password *</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Confirm your password"
           placeholderTextColor="#555b7a"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          value={confirm}
+          onChangeText={setConfirm}
           secureTextEntry
-          returnKeyType="done"
         />
 
-        <Text style={styles.roleLabel}>Select Your Role *</Text>
-        <View style={styles.roleGrid}>
-          {roles.map((r) => (
-            <TouchableOpacity
-              key={r.key}
-              style={[styles.roleButton, role === r.key && styles.roleActive]}
-              onPress={() => setRole(r.key)}
-            >
-              <Text
-                style={[
-                  styles.roleText,
-                  role === r.key && styles.roleTextActive,
-                ]}
-              >
+        <Text style={s.roleTitle}>Select Your Role *</Text>
+        {ROLES.map((r) => (
+          <TouchableOpacity
+            key={r.key}
+            style={[
+              s.roleCard,
+              role === r.key && { borderColor: r.color, borderWidth: 1.5 },
+            ]}
+            onPress={() => setRole(r.key)}
+          >
+            <View style={[s.roleBar, { backgroundColor: r.color }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[s.roleName, role === r.key && { color: r.color }]}>
                 {r.label}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              <Text style={s.roleDesc}>{r.desc}</Text>
+            </View>
+            <View
+              style={[
+                s.roleCheck,
+                role === r.key && {
+                  backgroundColor: r.color,
+                  borderColor: r.color,
+                },
+              ]}
+            >
+              {role === r.key && (
+                <Text
+                  style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}
+                >
+                  ✓
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        ))}
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[s.button, loading && s.buttonDisabled]}
           onPress={handleRegister}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Create Account</Text>
+            <Text style={s.buttonText}>Create Account</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
-          <Text style={styles.linkText}>Already have an account? Login</Text>
+          <Text style={s.link}>Already have an account? Login</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flexGrow: 1,
     backgroundColor: "#0a0f2c",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24 },
+    padding: 24,
+  },
   logoBox: {
     width: 60,
     height: 60,
@@ -205,15 +248,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16 },
+    marginBottom: 16,
+  },
   logoText: { color: "#fff", fontSize: 28, fontWeight: "700" },
-  title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 6 },
-  subtitle: { fontSize: 14, color: "#6b7280", marginBottom: 24 },
+  title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 4 },
+  subtitle: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginBottom: 24,
+    textAlign: "center",
+  },
   label: {
     color: "#9ca3af",
     fontSize: 13,
     alignSelf: "flex-start",
-    marginBottom: 6 },
+    marginBottom: 6,
+  },
   input: {
     width: "100%",
     backgroundColor: "#1a1f3c",
@@ -223,36 +273,48 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
-    fontSize: 15 },
-  roleLabel: {
+    fontSize: 15,
+  },
+  roleTitle: {
     color: "#fff",
     alignSelf: "flex-start",
     fontSize: 15,
     marginBottom: 12,
-    fontWeight: "500" },
-  roleGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+    fontWeight: "600",
+  },
+  roleCard: {
     width: "100%",
-    marginBottom: 24 },
-  roleButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    backgroundColor: "#1a1f3c",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 0.5,
-    borderColor: "#4f46e5",
-    backgroundColor: "#1a1f3c" },
-  roleActive: { backgroundColor: "#4f46e5" },
-  roleText: { color: "#4f46e5", fontSize: 13 },
-  roleTextActive: { color: "#fff" },
+    borderColor: "#2a2f5c",
+  },
+  roleBar: { width: 4, height: 40, borderRadius: 2, marginRight: 14 },
+  roleName: { color: "#fff", fontSize: 14, fontWeight: "600", marginBottom: 2 },
+  roleDesc: { color: "#6b7280", fontSize: 11 },
+  roleCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2a2f5c",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   button: {
     width: "100%",
     backgroundColor: "#4f46e5",
     borderRadius: 12,
     padding: 15,
     alignItems: "center",
-    marginBottom: 16 },
+    marginBottom: 16,
+    marginTop: 8,
+  },
   buttonDisabled: { backgroundColor: "#3730a3" },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  linkText: { color: "#4f46e5", fontSize: 14 } });
+  link: { color: "#4f46e5", fontSize: 14 },
+});

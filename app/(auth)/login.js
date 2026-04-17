@@ -12,12 +12,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-<<<<<<< HEAD
-  View } from "react-native";
-=======
   View,
 } from "react-native";
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
 import { auth } from "../../config/auth";
 import { db } from "../../config/firebase";
 
@@ -28,58 +24,49 @@ export default function LoginScreen() {
 
   const handleLogin = useCallback(async () => {
     if (!email.trim()) {
-      Alert.alert("Validation Error", "Please enter your email");
+      Alert.alert("Error", "Please enter your email");
       return;
     }
     if (!password.trim()) {
-      Alert.alert("Validation Error", "Please enter your password");
+      Alert.alert("Error", "Please enter your password");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Validation Error", "Password must be at least 6 characters");
+      Alert.alert("Error", "Password must be at least 6 characters");
       return;
     }
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(
+      const cred = await signInWithEmailAndPassword(
         auth,
         email.trim(),
         password,
       );
-      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
-      if (userDoc.exists()) {
-        const role = userDoc.data().role;
-        Alert.alert("Success", "Welcome back!", [
-          {
-            text: "OK",
-            onPress: () => {
-              if (role === "student") router.replace("/(student)");
-              else if (role === "lecturer") router.replace("/(lecturer)");
-              else if (role === "prl") router.replace("/(prl)");
-              else if (role === "pl") router.replace("/(pl)");
-<<<<<<< HEAD
-            } },
-=======
-            },
-          },
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
-        ]);
+      const snap = await getDoc(doc(db, "users", cred.user.uid));
+      if (snap.exists()) {
+        const role = snap.data().role;
+        if (role === "student") router.replace("/(student)");
+        else if (role === "lecturer") router.replace("/(lecturer)");
+        else if (role === "prl") router.replace("/(prl)");
+        else if (role === "pl") router.replace("/(pl)");
+        else Alert.alert("Error", "Unknown role. Contact admin.");
       } else {
-        Alert.alert("Error", "User profile not found. Please register again.");
+        Alert.alert("Error", "Profile not found. Please register first.");
       }
     } catch (error) {
-      let message = "Login failed. Please try again.";
-      if (error.code === "auth/invalid-email")
-        message = "Invalid email address.";
+      console.log("Login error:", error.code, error.message);
+      let msg = "Login failed. Check your email and password.";
+      if (error.code === "auth/invalid-email") msg = "Invalid email address.";
       else if (error.code === "auth/user-not-found")
-        message = "No account found with this email.";
-      else if (error.code === "auth/wrong-password")
-        message = "Incorrect password. Please try again.";
-      else if (error.code === "auth/too-many-requests")
-        message = "Too many attempts. Please try later.";
+        msg = "No account with this email. Please register first.";
+      else if (error.code === "auth/wrong-password") msg = "Wrong password.";
       else if (error.code === "auth/invalid-credential")
-        message = "Invalid email or password.";
-      Alert.alert("Login Failed", message);
+        msg = "Invalid email or password.";
+      else if (error.code === "auth/network-request-failed")
+        msg = "No internet connection.";
+      else if (error.code === "auth/too-many-requests")
+        msg = "Too many attempts. Try later.";
+      Alert.alert("Login Failed", msg);
     }
     setLoading(false);
   }, [email, password]);
@@ -90,18 +77,18 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={s.container}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoBox}>
-          <Text style={styles.logoText}>L</Text>
+        <View style={s.logoBox}>
+          <Text style={s.logoText}>L</Text>
         </View>
-        <Text style={styles.title}>LUCT Reporting</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
+        <Text style={s.title}>LUCT Reporting</Text>
+        <Text style={s.subtitle}>Faculty of ICT</Text>
 
-        <Text style={styles.label}>Email Address</Text>
+        <Text style={s.label}>Email Address</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Enter your email"
           placeholderTextColor="#555b7a"
           value={email}
@@ -109,13 +96,11 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
-          returnKeyType="next"
-          blurOnSubmit={false}
         />
 
-        <Text style={styles.label}>Password</Text>
+        <Text style={s.label}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={s.input}
           placeholder="Enter your password"
           placeholderTextColor="#555b7a"
           value={password}
@@ -126,37 +111,33 @@ export default function LoginScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[s.button, loading && s.buttonDisabled]}
           onPress={handleLogin}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Login</Text>
+            <Text style={s.buttonText}>Login</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-          <Text style={styles.linkText}>Don't have an account? Register</Text>
+          <Text style={s.link}>Don't have an account? Register here</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flexGrow: 1,
     backgroundColor: "#0a0f2c",
     alignItems: "center",
     justifyContent: "center",
-<<<<<<< HEAD
-    padding: 24 },
-=======
     padding: 24,
   },
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   logoBox: {
     width: 60,
     height: 60,
@@ -164,25 +145,33 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-<<<<<<< HEAD
-    marginBottom: 16 },
-=======
     marginBottom: 16,
   },
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   logoText: { color: "#fff", fontSize: 28, fontWeight: "700" },
-  title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 6 },
-  subtitle: { fontSize: 14, color: "#6b7280", marginBottom: 36 },
+  title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 4 },
+  subtitle: { fontSize: 13, color: "#6b7280", marginBottom: 24 },
+  infoBox: {
+    backgroundColor: "#1a1f3c",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 0.5,
+    borderColor: "#f59e0b",
+    marginBottom: 24,
+    width: "100%",
+  },
+  infoTitle: {
+    color: "#f59e0b",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  infoText: { color: "#9ca3af", fontSize: 12 },
   label: {
     color: "#9ca3af",
     fontSize: 13,
     alignSelf: "flex-start",
-<<<<<<< HEAD
-    marginBottom: 6 },
-=======
     marginBottom: 6,
   },
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   input: {
     width: "100%",
     backgroundColor: "#1a1f3c",
@@ -192,12 +181,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
-<<<<<<< HEAD
-    fontSize: 15 },
-=======
     fontSize: 15,
   },
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
   button: {
     width: "100%",
     backgroundColor: "#4f46e5",
@@ -205,16 +190,9 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: "center",
     marginBottom: 16,
-<<<<<<< HEAD
-    marginTop: 8 },
-  buttonDisabled: { backgroundColor: "#3730a3" },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  linkText: { color: "#4f46e5", fontSize: 14 } });
-=======
     marginTop: 8,
   },
   buttonDisabled: { backgroundColor: "#3730a3" },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  linkText: { color: "#4f46e5", fontSize: 14 },
+  link: { color: "#4f46e5", fontSize: 14 },
 });
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7

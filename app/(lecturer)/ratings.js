@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,121 +11,164 @@ import {
 import { useAuth } from "../../config/AuthContext";
 import { getRatingsByLecturer } from "../../config/firestore";
 
-export default function RatingsScreen() {
+export default function LecturerRatings() {
   const { profile } = useAuth();
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
-    loadRatings();
+    if (!profile?.id) return;
+    (async () => {
+      try {
+        const data = await getRatingsByLecturer(profile.id);
+        setRatings(data);
+      } catch (e) {
+        console.log("Ratings error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
 
-  const loadRatings = async () => {
-    try {
-      const data = await getRatingsByLecturer(profile.id);
-      setRatings(data);
-    } catch (e) {
-      console.log("Error:", e);
-    }
-    setLoading(false);
-  };
-
-  const avgRating =
+  const avg =
     ratings.length > 0
       ? (ratings.reduce((a, b) => a + b.rating, 0) / ratings.length).toFixed(1)
       : "0.0";
 
-  const Stars = ({ count }) => (
-    <View style={{ flexDirection: "row", gap: 4 }}>
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Text
-          key={s}
-          style={{ fontSize: 18, color: s <= count ? "#f59e0b" : "#2a2f5c" }}
-        >
-          ★
-        </Text>
-      ))}
-    </View>
-  );
-
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Ratings</Text>
+          <Text style={s.title}>My Ratings</Text>
           <View style={{ width: 50 }} />
         </View>
 
-        <View style={styles.overallCard}>
-          <Text style={styles.overallValue}>{avgRating}</Text>
-          <Stars count={Math.round(parseFloat(avgRating))} />
-          <Text style={styles.overallLabel}>
-            Based on {ratings.length} reviews
+        <View style={s.overallCard}>
+          <Text style={s.overallVal}>{avg}</Text>
+          <View style={{ flexDirection: "row", gap: 4, marginBottom: 8 }}>
+            {[1, 2, 3, 4, 5].map((st) => (
+              <Text
+                key={st}
+                style={{
+                  fontSize: 24,
+                  color:
+                    st <= Math.round(parseFloat(avg)) ? "#f59e0b" : "#2a2f5c",
+                }}
+              >
+                ★
+              </Text>
+            ))}
+          </View>
+          <Text style={s.overallLabel}>
+            Based on {ratings.length} student reviews
           </Text>
-          <View style={styles.breakdown}>
+          <View style={{ width: "100%", gap: 8, marginTop: 16 }}>
             {[5, 4, 3, 2, 1].map((star) => {
               const count = ratings.filter((r) => r.rating === star).length;
-              const percent =
+              const pct =
                 ratings.length > 0 ? (count / ratings.length) * 100 : 0;
               return (
-                <View key={star} style={styles.breakdownRow}>
-                  <Text style={styles.breakdownStar}>{star} ★</Text>
-                  <View style={styles.breakdownBar}>
+                <View
+                  key={star}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <Text style={{ color: "#f59e0b", fontSize: 12, width: 30 }}>
+                    {star} ★
+                  </Text>
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 6,
+                      backgroundColor: "#0a0f2c",
+                      borderRadius: 3,
+                    }}
+                  >
                     <View
-                      style={[styles.breakdownFill, { width: `${percent}%` }]}
+                      style={{
+                        width: `${pct}%`,
+                        height: 6,
+                        backgroundColor: "#f59e0b",
+                        borderRadius: 3,
+                      }}
                     />
                   </View>
-                  <Text style={styles.breakdownCount}>{count}</Text>
+                  <Text
+                    style={{
+                      color: "#6b7280",
+                      fontSize: 12,
+                      width: 20,
+                      textAlign: "right",
+                    }}
+                  >
+                    {count}
+                  </Text>
                 </View>
               );
             })}
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>
-          Student Reviews ({ratings.length})
-        </Text>
+        <Text style={s.section}>Student Reviews ({ratings.length})</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
         ) : ratings.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No ratings yet</Text>
+          <View style={s.empty}>
+            <Text style={s.emptyIcon}>⭐</Text>
+            <Text style={s.emptyTitle}>No ratings yet</Text>
+            <Text style={s.emptyText}>
+              Students will rate you after attending your classes.
+            </Text>
           </View>
         ) : (
-          ratings.map((item, index) => (
-            <View key={item.id || index} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <View style={styles.reviewAvatar}>
-                  <Text style={styles.reviewAvatarText}>
+          ratings.map((item, i) => (
+            <View key={item.id || i} style={s.reviewCard}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 8,
+                  gap: 10,
+                }}
+              >
+                <View style={s.avatar}>
+                  <Text style={s.avatarText}>
                     {item.studentName?.charAt(0) || "S"}
                   </Text>
                 </View>
-                <View style={styles.reviewInfo}>
-                  <Text style={styles.reviewName}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.reviewName}>
                     {item.studentName || "Student"}
                   </Text>
-                  <Text style={styles.reviewCourse}>
-                    {item.course || "N/A"}
-                  </Text>
+                  <Text style={s.reviewDate}>{item.course || "N/A"}</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 2 }}>
+                  {[1, 2, 3, 4, 5].map((st) => (
+                    <Text
+                      key={st}
+                      style={{
+                        fontSize: 14,
+                        color: st <= item.rating ? "#f59e0b" : "#2a2f5c",
+                      }}
+                    >
+                      ★
+                    </Text>
+                  ))}
                 </View>
               </View>
-              <Stars count={item.rating} />
               {item.comment ? (
-                <Text style={styles.reviewComment}>{item.comment}</Text>
+                <Text style={s.comment}>{item.comment}</Text>
               ) : null}
             </View>
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 20 },
   header: {
@@ -136,8 +178,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
   overallCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
@@ -147,44 +189,25 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  overallValue: { color: "#f59e0b", fontSize: 56, fontWeight: "700" },
-  overallLabel: {
-    color: "#6b7280",
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  breakdown: { width: "100%", gap: 8 },
-  breakdownRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  breakdownStar: { color: "#f59e0b", fontSize: 12, width: 30 },
-  breakdownBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: "#0a0f2c",
-    borderRadius: 3,
-  },
-  breakdownFill: { height: 6, backgroundColor: "#f59e0b", borderRadius: 3 },
-  breakdownCount: {
-    color: "#6b7280",
-    fontSize: 12,
-    width: 20,
-    textAlign: "right",
-  },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  emptyBox: {
+  overallVal: { color: "#f59e0b", fontSize: 56, fontWeight: "700" },
+  overallLabel: { color: "#6b7280", fontSize: 13 },
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  empty: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
-    padding: 24,
+    padding: 28,
     alignItems: "center",
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  emptyText: { color: "#6b7280", fontSize: 12, textAlign: "center" },
   reviewCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
@@ -193,13 +216,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  reviewHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 10,
-  },
-  reviewAvatar: {
+  avatar: {
     width: 38,
     height: 38,
     backgroundColor: "#4f46e5",
@@ -207,9 +224,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  reviewAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  reviewInfo: { flex: 1 },
+  avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   reviewName: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  reviewCourse: { color: "#6b7280", fontSize: 12 },
-  reviewComment: { color: "#9ca3af", fontSize: 13, marginTop: 8 },
+  reviewDate: { color: "#6b7280", fontSize: 12, marginTop: 2 },
+  comment: { color: "#9ca3af", fontSize: 13, marginTop: 4 },
 });

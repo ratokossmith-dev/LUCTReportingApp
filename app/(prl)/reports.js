@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,10 +17,10 @@ export default function PRLReports() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("All");
-  const [selectedReport, setSelectedReport] = useState(null);
+  const [filter, setFilter] = useState("Pending");
+  const [selected, setSelected] = useState(null);
   const [feedback, setFeedback] = useState("");
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -33,79 +32,85 @@ export default function PRLReports() {
       const data = await getAllReports();
       setReports(data);
     } catch (e) {
-      console.log("Error:", e);
+      console.log("Reports load error:", e);
     }
     setLoading(false);
   };
 
   const handleFeedback = useCallback(async () => {
     if (!feedback.trim()) {
-      Alert.alert("Error", "Please enter feedback");
+      Alert.alert("Error", "Please enter your feedback");
       return;
     }
     setSaving(true);
     try {
-      await addFeedbackToReport(selectedReport.id, feedback);
+      await addFeedbackToReport(selected.id, feedback.trim());
       setReports((prev) =>
         prev.map((r) =>
-          r.id === selectedReport.id
-            ? { ...r, prlFeedback: feedback, status: "Reviewed" }
+          r.id === selected.id
+            ? { ...r, prlFeedback: feedback.trim(), status: "Reviewed" }
             : r,
         ),
       );
-      setModalVisible(false);
+      setModal(false);
       setFeedback("");
-      Alert.alert("Success", "Feedback submitted successfully!");
+      Alert.alert(
+        "Feedback Sent! ✅",
+        "The lecturer can now see your feedback in their Monitoring screen.",
+      );
     } catch (e) {
       Alert.alert("Error", "Failed to submit feedback");
     }
     setSaving(false);
-  }, [feedback, selectedReport]);
+  }, [feedback, selected]);
 
   const filtered = reports.filter((r) => {
-    const matchStatus = selectedStatus === "All" || r.status === selectedStatus;
+    const matchFilter =
+      filter === "All" ||
+      (filter === "Pending" && r.status !== "Reviewed") ||
+      r.status === filter;
     const matchSearch =
       !search ||
       (r.lecturerName || "").toLowerCase().includes(search.toLowerCase()) ||
       (r.topicTaught || "").toLowerCase().includes(search.toLowerCase()) ||
       (r.className || "").toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+    return matchFilter && matchSearch;
   });
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Reports</Text>
+          <Text style={s.title}>Reports</Text>
           <View style={{ width: 50 }} />
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#4f46e5" }]}>
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
+            <Text style={[s.statVal, { color: "#4f46e5" }]}>
               {reports.length}
             </Text>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={s.statLabel}>Total</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#10b981" }]}>
+          <View style={s.statBox}>
+            <Text style={[s.statVal, { color: "#10b981" }]}>
               {reports.filter((r) => r.status === "Reviewed").length}
             </Text>
-            <Text style={styles.statLabel}>Reviewed</Text>
+            <Text style={s.statLabel}>Reviewed</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#f59e0b" }]}>
+          <View style={s.statBox}>
+            <Text style={[s.statVal, { color: "#f59e0b" }]}>
               {reports.filter((r) => r.status !== "Reviewed").length}
             </Text>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={s.statLabel}>Pending</Text>
           </View>
         </View>
 
         <TextInput
-          style={styles.searchInput}
+          style={s.input}
           placeholder="Search reports..."
           placeholderTextColor="#555b7a"
           value={search}
@@ -115,99 +120,98 @@ export default function PRLReports() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
+          style={{ marginBottom: 20 }}
         >
-          {["All", "Reviewed", "Pending"].map((s) => (
+          {["Pending", "All", "Reviewed"].map((f) => (
             <TouchableOpacity
-              key={s}
-              style={[
-                styles.filterBtn,
-                selectedStatus === s && styles.filterBtnActive,
-              ]}
-              onPress={() => setSelectedStatus(s)}
+              key={f}
+              style={[s.filterBtn, filter === f && s.filterActive]}
+              onPress={() => setFilter(f)}
             >
-              <Text
-                style={[
-                  styles.filterText,
-                  selectedStatus === s && styles.filterTextActive,
-                ]}
-              >
-                {s}
+              <Text style={[s.filterText, filter === f && s.filterTextActive]}>
+                {f}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>Reports ({filtered.length})</Text>
+        <Text style={s.section}>Reports ({filtered.length})</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
         ) : filtered.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No reports found</Text>
+          <View style={s.empty}>
+            <Text style={s.emptyText}>
+              {filter === "Pending"
+                ? "✅ No pending reports!"
+                : "No reports found"}
+            </Text>
           </View>
         ) : (
-          filtered.map((report) => (
-            <View key={report.id} style={styles.reportCard}>
-              <View style={styles.reportHeader}>
-                <View style={styles.classBadge}>
-                  <Text style={styles.classBadgeText}>{report.className}</Text>
+          filtered.map((r) => (
+            <View key={r.id} style={s.card}>
+              <View style={s.cardHeader}>
+                <View style={s.classBadge}>
+                  <Text style={s.classBadgeText}>{r.className}</Text>
                 </View>
                 <View
                   style={[
-                    styles.statusBadge,
-                    report.status === "Reviewed"
-                      ? styles.statusReviewed
-                      : styles.statusPending,
+                    s.statusBadge,
+                    r.status === "Reviewed"
+                      ? s.statusReviewed
+                      : s.statusPending,
                   ]}
                 >
                   <Text
                     style={[
-                      styles.statusText,
-                      report.status === "Reviewed"
-                        ? styles.statusTextReviewed
-                        : styles.statusTextPending,
+                      s.statusText,
+                      r.status === "Reviewed" ? s.textReviewed : s.textPending,
                     ]}
                   >
-                    {report.status || "Pending"}
+                    {r.status || "Pending"}
                   </Text>
                 </View>
               </View>
-              <Text style={styles.reportTopic}>{report.topicTaught}</Text>
-              <Text style={styles.reportCourse}>
-                {report.courseCode} — {report.courseName}
+              <Text style={s.topic}>{r.topicTaught}</Text>
+              <Text style={s.courseSub}>
+                {r.courseCode} — {r.courseName}
               </Text>
-              <View style={styles.reportMeta}>
-                <Text style={styles.metaText}>👨‍🏫 {report.lecturerName}</Text>
-                <Text style={styles.metaText}>📅 {report.dateOfLecture}</Text>
-                <Text style={styles.metaText}>
-                  👥 {report.actualStudentsPresent}/
-                  {report.totalRegisteredStudents}
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={s.meta}>👨‍🏫 {r.lecturerName}</Text>
+                <Text style={s.meta}>📅 {r.dateOfLecture}</Text>
+                <Text style={s.meta}>
+                  👥 {r.actualStudentsPresent}/{r.totalRegisteredStudents}
                 </Text>
+                <Text style={s.meta}>📆 Week {r.weekOfReporting}</Text>
               </View>
-              {report.learningOutcomes ? (
-                <View style={styles.outcomesBox}>
-                  <Text style={styles.outcomesLabel}>Learning Outcomes:</Text>
-                  <Text style={styles.outcomesText}>
-                    {report.learningOutcomes}
-                  </Text>
+              {r.learningOutcomes ? (
+                <View style={s.outcomesBox}>
+                  <Text style={s.outcomesLabel}>Learning Outcomes:</Text>
+                  <Text style={s.outcomesText}>{r.learningOutcomes}</Text>
                 </View>
               ) : null}
-              {report.prlFeedback ? (
-                <View style={styles.feedbackBox}>
-                  <Text style={styles.feedbackLabel}>Your Feedback:</Text>
-                  <Text style={styles.feedbackText}>{report.prlFeedback}</Text>
+              {r.prlFeedback ? (
+                <View style={s.feedbackBox}>
+                  <Text style={s.feedbackLabel}>Your Feedback:</Text>
+                  <Text style={s.feedbackText}>{r.prlFeedback}</Text>
                 </View>
               ) : null}
               <TouchableOpacity
-                style={styles.feedbackBtn}
+                style={s.feedbackBtn}
                 onPress={() => {
-                  setSelectedReport(report);
-                  setFeedback(report.prlFeedback || "");
-                  setModalVisible(true);
+                  setSelected(r);
+                  setFeedback(r.prlFeedback || "");
+                  setModal(true);
                 }}
               >
-                <Text style={styles.feedbackBtnText}>
-                  {report.prlFeedback ? "Edit Feedback" : "Add Feedback"}
+                <Text style={s.feedbackBtnText}>
+                  {r.prlFeedback ? "✏️ Edit Feedback" : "💬 Add Feedback"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -215,53 +219,51 @@ export default function PRLReports() {
         )}
       </ScrollView>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add Feedback</Text>
-            {selectedReport && (
-              <Text style={styles.modalSubtitle}>
-                {selectedReport.lecturerName} — {selectedReport.className}
+      <Modal visible={modal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Add Feedback</Text>
+            {selected && (
+              <Text style={s.modalSub}>
+                {selected.lecturerName} — {selected.className} — Week{" "}
+                {selected.weekOfReporting}
               </Text>
             )}
             <TextInput
-              style={styles.feedbackInput}
-              placeholder="Enter your feedback..."
+              style={s.feedbackInput}
+              placeholder="Enter your feedback for the lecturer..."
               placeholderTextColor="#555b7a"
               value={feedback}
               onChangeText={setFeedback}
               multiline
             />
-            <View style={styles.modalButtons}>
+            <View style={s.modalBtns}>
               <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setModalVisible(false)}
+                style={s.cancelBtn}
+                onPress={() => setModal(false)}
               >
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={s.cancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.submitBtn,
-                  saving && { backgroundColor: "#3730a3" },
-                ]}
+                style={[s.submitBtn, saving && { backgroundColor: "#3730a3" }]}
                 onPress={handleFeedback}
                 disabled={saving}
               >
                 {saving ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitText}>Submit</Text>
+                  <Text style={s.submitText}>Submit</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 20 },
   header: {
@@ -271,8 +273,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   statBox: {
     flex: 1,
@@ -283,9 +285,9 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 24, fontWeight: "700" },
+  statVal: { fontSize: 24, fontWeight: "700" },
   statLabel: { color: "#6b7280", fontSize: 11, marginTop: 4 },
-  searchInput: {
+  input: {
     backgroundColor: "#1a1f3c",
     borderRadius: 12,
     padding: 12,
@@ -295,7 +297,6 @@ const styles = StyleSheet.create({
     borderColor: "#2a2f5c",
     fontSize: 14,
   },
-  filterScroll: { marginBottom: 20 },
   filterBtn: {
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -305,16 +306,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
     backgroundColor: "#1a1f3c",
   },
-  filterBtnActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
-  filterText: { color: "#6b7280", fontSize: 13, fontWeight: "500" },
+  filterActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
+  filterText: { color: "#6b7280", fontSize: 13 },
   filterTextActive: { color: "#fff" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  emptyBox: {
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  empty: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
     padding: 24,
@@ -323,7 +319,7 @@ const styles = StyleSheet.create({
     borderColor: "#2a2f5c",
   },
   emptyText: { color: "#6b7280", fontSize: 14 },
-  reportCard: {
+  card: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
     padding: 16,
@@ -331,7 +327,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  reportHeader: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
@@ -352,22 +348,11 @@ const styles = StyleSheet.create({
   statusReviewed: { borderColor: "#10b981" },
   statusPending: { borderColor: "#f59e0b" },
   statusText: { fontSize: 12, fontWeight: "600" },
-  statusTextReviewed: { color: "#10b981" },
-  statusTextPending: { color: "#f59e0b" },
-  reportTopic: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  reportCourse: { color: "#6b7280", fontSize: 12, marginBottom: 10 },
-  reportMeta: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 12,
-  },
-  metaText: { color: "#9ca3af", fontSize: 12 },
+  textReviewed: { color: "#10b981" },
+  textPending: { color: "#f59e0b" },
+  topic: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 4 },
+  courseSub: { color: "#6b7280", fontSize: 12, marginBottom: 10 },
+  meta: { color: "#9ca3af", fontSize: 12 },
   outcomesBox: {
     backgroundColor: "#0a0f2c",
     borderRadius: 10,
@@ -394,12 +379,12 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: "center",
     borderWidth: 0.5,
-    borderColor: "#4f46e5",
+    borderColor: "#f59e0b",
   },
-  feedbackBtnText: { color: "#4f46e5", fontSize: 13, fontWeight: "600" },
+  feedbackBtnText: { color: "#f59e0b", fontSize: 13, fontWeight: "600" },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.8)",
     justifyContent: "flex-end",
   },
   modalCard: {
@@ -414,20 +399,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 4,
   },
-  modalSubtitle: { color: "#6b7280", fontSize: 13, marginBottom: 16 },
+  modalSub: { color: "#6b7280", fontSize: 13, marginBottom: 16 },
   feedbackInput: {
     backgroundColor: "#0a0f2c",
     borderRadius: 12,
     padding: 14,
     color: "#fff",
-    minHeight: 120,
+    minHeight: 140,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
     fontSize: 14,
     textAlignVertical: "top",
     marginBottom: 16,
   },
-  modalButtons: { flexDirection: "row", gap: 10 },
+  modalBtns: { flexDirection: "row", gap: 10 },
   cancelBtn: {
     flex: 1,
     borderRadius: 12,

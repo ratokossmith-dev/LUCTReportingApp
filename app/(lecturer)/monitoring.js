@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,33 +14,30 @@ import {
   getReportsByLecturer,
 } from "../../config/firestore";
 
-export default function MonitoringScreen() {
+export default function LecturerMonitoring() {
   const { profile } = useAuth();
   const [reports, setReports] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWeek, setSelectedWeek] = useState("All");
 
   useEffect(() => {
-    if (!profile) return;
-    loadData();
+    if (!profile?.id) return;
+    (async () => {
+      try {
+        const [r, rat] = await Promise.all([
+          getReportsByLecturer(profile.id),
+          getRatingsByLecturer(profile.id),
+        ]);
+        setReports(r);
+        setRatings(rat);
+      } catch (e) {
+        console.log("Monitoring error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
 
-  const loadData = async () => {
-    try {
-      const [r, rat] = await Promise.all([
-        getReportsByLecturer(profile.id),
-        getRatingsByLecturer(profile.id),
-      ]);
-      setReports(r);
-      setRatings(rat);
-    } catch (e) {
-      console.log("Error:", e);
-    }
-    setLoading(false);
-  };
-
-  const avgAttendance =
+  const avgAtt =
     reports.length > 0
       ? Math.round(
           reports.reduce(
@@ -51,29 +47,20 @@ export default function MonitoringScreen() {
           ) / reports.length,
         )
       : 0;
-
   const avgRating =
     ratings.length > 0
       ? (ratings.reduce((a, b) => a + b.rating, 0) / ratings.length).toFixed(1)
       : "N/A";
-
-  const weeks = [
-    "All",
-    ...new Set(reports.map((r) => `Week ${r.weekOfReporting}`)),
-  ];
-  const filteredReports =
-    selectedWeek === "All"
-      ? reports
-      : reports.filter((r) => `Week ${r.weekOfReporting}` === selectedWeek);
+  const reviewed = reports.filter((r) => r.status === "Reviewed").length;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Monitoring</Text>
+          <Text style={s.title}>My Performance</Text>
           <View style={{ width: 50 }} />
         </View>
 
@@ -81,127 +68,102 @@ export default function MonitoringScreen() {
           <ActivityIndicator color="#4f46e5" />
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Performance Overview</Text>
-            <View style={styles.statsGrid}>
-              {[
-                {
-                  label: "Reports Submitted",
-                  value: reports.length,
-                  color: "#4f46e5",
-                },
-                {
-                  label: "Avg Attendance",
-                  value: `${avgAttendance}%`,
-                  color: "#10b981",
-                },
-                {
-                  label: "Total Ratings",
-                  value: ratings.length,
-                  color: "#f59e0b",
-                },
-                { label: "Avg Rating", value: avgRating, color: "#ec4899" },
-              ].map((stat, i) => (
-                <View key={i} style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: stat.color }]}>
-                    {stat.value}
-                  </Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              ))}
+            <View style={s.grid}>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#4f46e5" }]}>
+                  {reports.length}
+                </Text>
+                <Text style={s.statLabel}>Reports Submitted</Text>
+              </View>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#10b981" }]}>
+                  {reviewed}
+                </Text>
+                <Text style={s.statLabel}>Reviewed by PRL</Text>
+              </View>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#f59e0b" }]}>{avgAtt}%</Text>
+                <Text style={s.statLabel}>Avg Attendance</Text>
+              </View>
+              <View style={s.statCard}>
+                <Text style={[s.statVal, { color: "#ec4899" }]}>
+                  {avgRating}
+                </Text>
+                <Text style={s.statLabel}>Avg Rating</Text>
+              </View>
             </View>
 
-            <Text style={styles.sectionTitle}>Filter by Week</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.weekScroll}
-            >
-              {weeks.map((week) => (
-                <TouchableOpacity
-                  key={week}
-                  style={[
-                    styles.weekBtn,
-                    selectedWeek === week && styles.weekBtnActive,
-                  ]}
-                  onPress={() => setSelectedWeek(week)}
-                >
-                  <Text
-                    style={[
-                      styles.weekText,
-                      selectedWeek === week && styles.weekTextActive,
-                    ]}
-                  >
-                    {week}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text style={styles.sectionTitle}>
-              Reports ({filteredReports.length})
+            <Text style={s.section}>
+              My Reports & PRL Feedback ({reports.length})
             </Text>
-            {filteredReports.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No reports found</Text>
+            {reports.length === 0 ? (
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>📋</Text>
+                <Text style={s.emptyTitle}>No reports yet</Text>
+                <Text style={s.emptyText}>
+                  Submit a report from the Submit Report screen.
+                </Text>
               </View>
             ) : (
-              filteredReports.map((report) => (
-                <View key={report.id} style={styles.reportCard}>
-                  <View style={styles.reportHeader}>
-                    <View style={styles.classBadge}>
-                      <Text style={styles.classBadgeText}>
-                        {report.className}
-                      </Text>
+              reports.map((r) => (
+                <View key={r.id} style={s.reportCard}>
+                  <View style={s.reportHeader}>
+                    <View style={s.classBadge}>
+                      <Text style={s.classBadgeText}>{r.className}</Text>
                     </View>
                     <View
                       style={[
-                        styles.statusBadge,
-                        report.status === "Reviewed"
-                          ? styles.statusReviewed
-                          : styles.statusPending,
+                        s.statusBadge,
+                        r.status === "Reviewed"
+                          ? s.statusReviewed
+                          : s.statusPending,
                       ]}
                     >
                       <Text
                         style={[
-                          styles.statusText,
-                          report.status === "Reviewed"
-                            ? styles.statusTextReviewed
-                            : styles.statusTextPending,
+                          s.statusText,
+                          r.status === "Reviewed"
+                            ? s.textReviewed
+                            : s.textPending,
                         ]}
                       >
-                        {report.status || "Pending"}
+                        {r.status || "Pending"}
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.reportTopic}>{report.topicTaught}</Text>
-                  <View style={styles.reportDetails}>
-                    <Text style={styles.reportDetail}>
-                      Week {report.weekOfReporting}
-                    </Text>
-                    <Text style={styles.reportDetail}>
-                      👥 {report.actualStudentsPresent}/
-                      {report.totalRegisteredStudents}
+                  <Text style={s.topic}>{r.topicTaught}</Text>
+                  <View
+                    style={{ flexDirection: "row", gap: 16, marginBottom: 8 }}
+                  >
+                    <Text style={s.meta}>Week {r.weekOfReporting}</Text>
+                    <Text style={s.meta}>📅 {r.dateOfLecture}</Text>
+                    <Text style={s.meta}>
+                      👥 {r.actualStudentsPresent}/{r.totalRegisteredStudents}
                     </Text>
                   </View>
-                  {report.prlFeedback ? (
-                    <View style={styles.feedbackBox}>
-                      <Text style={styles.feedbackLabel}>PRL Feedback:</Text>
-                      <Text style={styles.feedbackText}>
-                        {report.prlFeedback}
+                  {r.prlFeedback ? (
+                    <View style={s.feedbackBox}>
+                      <Text style={s.feedbackLabel}>💬 PRL Feedback:</Text>
+                      <Text style={s.feedbackText}>{r.prlFeedback}</Text>
+                    </View>
+                  ) : (
+                    <View style={s.noFeedback}>
+                      <Text style={s.noFeedbackText}>
+                        ⏳ Awaiting PRL feedback...
                       </Text>
                     </View>
-                  ) : null}
+                  )}
                 </View>
               ))
             )}
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 20 },
   header: {
@@ -211,20 +173,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 28,
-  },
+  back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   statCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
@@ -233,35 +184,30 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 26, fontWeight: "700", marginBottom: 4 },
+  statVal: { fontSize: 26, fontWeight: "700", marginBottom: 4 },
   statLabel: { color: "#6b7280", fontSize: 11 },
-  weekScroll: { marginBottom: 16 },
-  weekBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    marginRight: 8,
-    backgroundColor: "#1a1f3c",
-  },
-  weekBtnActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
-  weekText: { color: "#6b7280", fontSize: 13, fontWeight: "500" },
-  weekTextActive: { color: "#fff" },
-  emptyBox: {
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  empty: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
-    padding: 24,
+    padding: 28,
     alignItems: "center",
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  emptyText: { color: "#6b7280", fontSize: 12, textAlign: "center" },
   reportCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 14,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
@@ -286,24 +232,31 @@ const styles = StyleSheet.create({
   statusReviewed: { borderColor: "#10b981" },
   statusPending: { borderColor: "#f59e0b" },
   statusText: { fontSize: 12, fontWeight: "600" },
-  statusTextReviewed: { color: "#10b981" },
-  statusTextPending: { color: "#f59e0b" },
-  reportTopic: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  reportDetails: { flexDirection: "row", gap: 16 },
-  reportDetail: { color: "#6b7280", fontSize: 13 },
+  textReviewed: { color: "#10b981" },
+  textPending: { color: "#f59e0b" },
+  topic: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 8 },
+  meta: { color: "#6b7280", fontSize: 12 },
   feedbackBox: {
     backgroundColor: "#0a0f2c",
     borderRadius: 10,
-    padding: 10,
-    marginTop: 10,
+    padding: 12,
     borderWidth: 0.5,
     borderColor: "#10b981",
   },
-  feedbackLabel: { color: "#10b981", fontSize: 11, marginBottom: 4 },
+  feedbackLabel: {
+    color: "#10b981",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
   feedbackText: { color: "#9ca3af", fontSize: 13 },
+  noFeedback: {
+    backgroundColor: "#0a0f2c",
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 0.5,
+    borderColor: "#2a2f5c",
+    alignItems: "center",
+  },
+  noFeedbackText: { color: "#6b7280", fontSize: 12 },
 });

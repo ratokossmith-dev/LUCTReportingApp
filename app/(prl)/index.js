@@ -3,7 +3,6 @@ import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,7 +14,6 @@ import { useAuth } from "../../config/AuthContext";
 import {
   getAllCourses,
   getAllLecturers,
-  getAllRatings,
   getAllReports,
 } from "../../config/firestore";
 
@@ -25,47 +23,34 @@ export default function PRLDashboard() {
     courses: 0,
     lecturers: 0,
     reports: 0,
-    rating: "N/A",
+    pending: 0,
   });
-  const [recentReports, setRecentReports] = useState([]);
+  const [pendingReports, setPendingReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!profile) return;
-    loadData();
+    (async () => {
+      try {
+        const [reports, courses, lecturers] = await Promise.all([
+          getAllReports(),
+          getAllCourses(),
+          getAllLecturers(),
+        ]);
+        const pending = reports.filter((r) => r.status !== "Reviewed");
+        setStats({
+          courses: courses.length,
+          lecturers: lecturers.length,
+          reports: reports.length,
+          pending: pending.length,
+        });
+        setPendingReports(pending.slice(0, 3));
+      } catch (e) {
+        console.log("PRL dashboard error:", e);
+      }
+      setLoading(false);
+    })();
   }, [profile]);
-
-  const loadData = async () => {
-    try {
-      const [reports, courses, lecturers, ratings] = await Promise.all([
-        getAllReports(),
-        getAllCourses(),
-        getAllLecturers(),
-        getAllRatings(),
-      ]);
-      const avgRating =
-        ratings.length > 0
-          ? (
-              ratings.reduce((a, b) => a + b.rating, 0) / ratings.length
-            ).toFixed(1)
-          : "N/A";
-      setStats({
-        courses: courses.length,
-        lecturers: lecturers.length,
-        reports: reports.length,
-        rating: avgRating,
-      });
-      setRecentReports(reports.slice(0, 3));
-    } catch (e) {
-      console.log("Error:", e);
-    }
-    setLoading(false);
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/(auth)/login");
-  };
 
   const initials = profile?.name
     ? profile.name
@@ -74,168 +59,163 @@ export default function PRLDashboard() {
         .join("")
         .toUpperCase()
         .slice(0, 2)
-    : "PL";
+    : "PR";
 
-  const menuItems = [
-    {
-      icon: "📚",
-      title: "Courses",
-      subtitle: "View all courses & lectures",
-      route: "/(prl)/courses",
-    },
+  const menu = [
     {
       icon: "📋",
       title: "Reports",
-      subtitle: "View reports & add feedback",
+      sub: "View reports & add feedback",
       route: "/(prl)/reports",
     },
     {
       icon: "📊",
       title: "Monitoring",
-      subtitle: "Monitor lecturers",
+      sub: "Monitor lecturer performance",
       route: "/(prl)/monitoring",
     },
     {
       icon: "⭐",
       title: "Ratings",
-      subtitle: "View all ratings",
+      sub: "View all student ratings",
       route: "/(prl)/ratings",
+    },
+    {
+      icon: "📚",
+      title: "Courses",
+      sub: "View all courses",
+      route: "/(prl)/courses",
     },
     {
       icon: "🏫",
       title: "Classes",
-      subtitle: "View all classes",
+      sub: "View all classes",
       route: "/(prl)/classes",
     },
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
           <View>
-            <Text style={styles.greeting}>Welcome back 👋</Text>
-            <Text style={styles.name}>
-              {profile?.name || "Principal Lecturer"}
-            </Text>
-            <Text style={styles.role}>Principal Lecturer</Text>
+            <Text style={s.greeting}>Welcome back 👋</Text>
+            <Text style={s.name}>{profile?.name || "Principal Lecturer"}</Text>
+            <Text style={s.role}>Principal Lecturer</Text>
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{initials}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Overview</Text>
+        <Text style={s.section}>Overview</Text>
         {loading ? (
           <ActivityIndicator color="#f59e0b" style={{ marginBottom: 28 }} />
         ) : (
-          <View style={styles.statsGrid}>
-            {[
-              { label: "Courses", value: stats.courses, color: "#4f46e5" },
-              { label: "Lecturers", value: stats.lecturers, color: "#10b981" },
-              { label: "Reports", value: stats.reports, color: "#f59e0b" },
-              { label: "Avg Rating", value: stats.rating, color: "#ec4899" },
-            ].map((stat, i) => (
-              <View key={i} style={styles.statCard}>
-                <Text style={[styles.statValue, { color: stat.color }]}>
-                  {stat.value}
-                </Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
+          <View style={s.grid}>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#4f46e5" }]}>
+                {stats.courses}
+              </Text>
+              <Text style={s.statLabel}>Courses</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#10b981" }]}>
+                {stats.lecturers}
+              </Text>
+              <Text style={s.statLabel}>Lecturers</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#f59e0b" }]}>
+                {stats.reports}
+              </Text>
+              <Text style={s.statLabel}>Total Reports</Text>
+            </View>
+            <View style={s.statCard}>
+              <Text style={[s.statVal, { color: "#ef4444" }]}>
+                {stats.pending}
+              </Text>
+              <Text style={s.statLabel}>Pending Review</Text>
+            </View>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Recent Reports</Text>
-        {loading ? (
-          <ActivityIndicator color="#f59e0b" />
-        ) : recentReports.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No reports yet</Text>
+        <Text style={s.section}>Reports Needing Review</Text>
+        {pendingReports.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={s.emptyText}>✅ All reports have been reviewed!</Text>
           </View>
         ) : (
-          <View style={styles.reportsCard}>
-            {recentReports.map((report, index) => (
+          <View style={s.card}>
+            {pendingReports.map((r, i) => (
               <View
-                key={report.id}
-                style={[
-                  styles.reportItem,
-                  index !== recentReports.length - 1 && styles.reportItemBorder,
-                ]}
+                key={r.id}
+                style={[s.row, i !== pendingReports.length - 1 && s.rowBorder]}
               >
-                <View style={styles.reportAvatar}>
-                  <Text style={styles.reportAvatarText}>
-                    {report.lecturerName?.charAt(0) || "L"}
+                <View style={s.rAvatar}>
+                  <Text style={s.rAvatarText}>
+                    {r.lecturerName?.charAt(0) || "L"}
                   </Text>
                 </View>
-                <View style={styles.reportInfo}>
-                  <Text style={styles.reportLecturer}>
-                    {report.lecturerName}
-                  </Text>
-                  <Text style={styles.reportClass}>
-                    {report.className} — {report.topicTaught}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rName}>{r.lecturerName}</Text>
+                  <Text style={s.rSub}>
+                    {r.className} — Week {r.weekOfReporting}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    report.status === "Reviewed"
-                      ? styles.statusReviewed
-                      : styles.statusPending,
-                  ]}
+                <TouchableOpacity
+                  style={s.reviewBtn}
+                  onPress={() => router.push("/(prl)/reports")}
                 >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      report.status === "Reviewed"
-                        ? styles.statusTextReviewed
-                        : styles.statusTextPending,
-                    ]}
-                  >
-                    {report.status || "Pending"}
-                  </Text>
-                </View>
+                  <Text style={s.reviewBtnText}>Review</Text>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.menuList}>
-          {menuItems.map((item, index) => (
+        <Text style={s.section}>Quick Actions</Text>
+        <View style={s.menuList}>
+          {menu.map((item, i) => (
             <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
+              key={i}
+              style={s.menuItem}
               onPress={() => router.push(item.route)}
             >
-              <View style={styles.menuIcon}>
-                <Text style={styles.menuIconText}>{item.icon}</Text>
+              <View style={s.menuIcon}>
+                <Text style={{ fontSize: 20 }}>{item.icon}</Text>
               </View>
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.menuTitle}>{item.title}</Text>
+                <Text style={s.menuSub}>{item.sub}</Text>
               </View>
-              <Text style={styles.menuArrow}>›</Text>
+              <Text style={s.arrow}>›</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity
+          style={s.logout}
+          onPress={async () => {
+            await signOut(auth);
+            router.replace("/(auth)/login");
+          }}
+        >
+          <Text style={s.logoutText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
   container: { flex: 1, padding: 24 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 24,
     marginTop: 16,
   },
   greeting: { color: "#6b7280", fontSize: 14, marginBottom: 4 },
@@ -250,18 +230,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 14,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 28,
-  },
+  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 14 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   statCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
@@ -270,19 +240,19 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
+  statVal: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
   statLabel: { color: "#6b7280", fontSize: 12 },
-  emptyBox: {
+  empty: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,
-    padding: 24,
+    padding: 20,
     alignItems: "center",
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
     marginBottom: 28,
   },
   emptyText: { color: "#6b7280", fontSize: 14 },
-  reportsCard: {
+  card: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
     padding: 4,
@@ -290,14 +260,9 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
   },
-  reportItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    gap: 12,
-  },
-  reportItemBorder: { borderBottomWidth: 0.5, borderBottomColor: "#2a2f5c" },
-  reportAvatar: {
+  row: { flexDirection: "row", alignItems: "center", padding: 12, gap: 12 },
+  rowBorder: { borderBottomWidth: 0.5, borderBottomColor: "#2a2f5c" },
+  rAvatar: {
     width: 38,
     height: 38,
     backgroundColor: "#4f46e5",
@@ -305,21 +270,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  reportAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  reportInfo: { flex: 1 },
-  reportLecturer: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  reportClass: { color: "#6b7280", fontSize: 12 },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  rAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  rName: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  rSub: { color: "#6b7280", fontSize: 12 },
+  reviewBtn: {
+    backgroundColor: "#f59e0b",
     borderRadius: 8,
-    borderWidth: 0.5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
-  statusReviewed: { borderColor: "#10b981" },
-  statusPending: { borderColor: "#f59e0b" },
-  statusText: { fontSize: 11, fontWeight: "600" },
-  statusTextReviewed: { color: "#10b981" },
-  statusTextPending: { color: "#f59e0b" },
+  reviewBtnText: { color: "#000", fontSize: 12, fontWeight: "700" },
   menuList: { gap: 10, marginBottom: 28 },
   menuItem: {
     backgroundColor: "#1a1f3c",
@@ -339,17 +299,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 14,
   },
-  menuIconText: { fontSize: 20 },
-  menuText: { flex: 1 },
   menuTitle: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
     marginBottom: 2,
   },
-  menuSubtitle: { color: "#6b7280", fontSize: 12 },
-  menuArrow: { color: "#f59e0b", fontSize: 24, fontWeight: "300" },
-  logoutButton: {
+  menuSub: { color: "#6b7280", fontSize: 11 },
+  arrow: { color: "#f59e0b", fontSize: 24, fontWeight: "300" },
+  logout: {
     borderWidth: 0.5,
     borderColor: "#ef4444",
     borderRadius: 14,

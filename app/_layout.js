@@ -1,5 +1,4 @@
 import { Slot, useRouter } from "expo-router";
-<<<<<<< HEAD
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
@@ -44,36 +43,12 @@ function RootLayoutNav() {
     if (loading) return;
     if (hasNavigated.current) return;
     hasNavigated.current = true;
-=======
-import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AuthProvider, useAuth } from "../config/AuthContext";
-
-function RootLayoutNav() {
-  const { user, profile, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-
-    const role = profile?.role;
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
-
-    if (!user) {
-      router.replace("/(auth)/login");
-    } else if (role === "student") {
-      router.replace("/(student)");
-    } else if (role === "lecturer") {
-      router.replace("/(lecturer)");
-    } else if (role === "prl") {
-      router.replace("/(prl)");
-    } else if (role === "pl") {
-      router.replace("/(pl)");
-    } else {
-      router.replace("/(auth)/login");
-    }
-<<<<<<< HEAD
+    if (!user) router.replace("/(auth)/login");
+    else if (role === "student") router.replace("/(student)");
+    else if (role === "lecturer") router.replace("/(lecturer)");
+    else if (role === "prl") router.replace("/(prl)");
+    else if (role === "pl") router.replace("/(pl)");
+    else router.replace("/(auth)/login");
   }, [loading, user, role]);
 
   if (loading) {
@@ -83,7 +58,8 @@ function RootLayoutNav() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#0a0f2c" }}
+          backgroundColor: "#0a0f2c",
+        }}
       >
         <ActivityIndicator size="large" color="#4f46e5" />
         <Text style={{ color: "#fff", marginTop: 16, fontSize: 14 }}>
@@ -96,7 +72,8 @@ function RootLayoutNav() {
             padding: 14,
             borderRadius: 12,
             width: 200,
-            alignItems: "center" }}
+            alignItems: "center",
+          }}
           onPress={() => {
             hasNavigated.current = true;
             setLoading(false);
@@ -105,14 +82,6 @@ function RootLayoutNav() {
         >
           <Text style={{ color: "#fff", fontWeight: "600" }}>Go to Login</Text>
         </TouchableOpacity>
-=======
-  }, [user, profile, loading]);
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
->>>>>>> 46e0c0d343859cd0b5abd6da7e5308c64cdfcba7
       </View>
     );
   }
