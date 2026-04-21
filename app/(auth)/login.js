@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,60 +14,68 @@ import {
   View,
 } from "react-native";
 import { auth } from "../../config/auth";
-import { db } from "../../config/firebase";
+import { useAuth } from "../../config/AuthContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { setProfile } = useAuth();
 
-  const handleLogin = useCallback(async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email");
-      return;
-    }
-    if (!password.trim()) {
-      Alert.alert("Error", "Please enter your password");
-      return;
+  const validateForm = () => {
+    if (!email.trim() || !email.includes("@")) {
+      Alert.alert("Validation Error", "Please enter a valid email address");
+      return false;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
-      return;
+      Alert.alert("Validation Error", "Password must be at least 6 characters");
+      return false;
     }
+    return true;
+  };
+
+  const handleLogin = useCallback(async () => {
+    if (!validateForm()) return;
+
     setLoading(true);
     try {
-      const cred = await signInWithEmailAndPassword(
+      const userCredential = await signInWithEmailAndPassword(
         auth,
         email.trim(),
         password,
       );
-      const snap = await getDoc(doc(db, "users", cred.user.uid));
-      if (snap.exists()) {
-        const role = snap.data().role;
-        if (role === "student") router.replace("/(student)");
-        else if (role === "lecturer") router.replace("/(lecturer)");
-        else if (role === "prl") router.replace("/(prl)");
-        else if (role === "pl") router.replace("/(pl)");
-        else Alert.alert("Error", "Unknown role. Contact admin.");
-      } else {
-        Alert.alert("Error", "Profile not found. Please register first.");
-      }
+
+      const user = userCredential.user;
+      console.log("Login successful:", user.email);
+
+      // The profile will be loaded by AuthContext automatically
+      // No need to manually fetch here
+
+      // Small delay to let AuthContext load profile
+      setTimeout(() => {
+        // Navigation will be handled by _layout.tsx based on role
+        Alert.alert("Success", "Login successful! Redirecting...");
+      }, 500);
     } catch (error) {
       console.log("Login error:", error.code, error.message);
-      let msg = "Login failed. Check your email and password.";
-      if (error.code === "auth/invalid-email") msg = "Invalid email address.";
-      else if (error.code === "auth/user-not-found")
-        msg = "No account with this email. Please register first.";
-      else if (error.code === "auth/wrong-password") msg = "Wrong password.";
-      else if (error.code === "auth/invalid-credential")
-        msg = "Invalid email or password.";
-      else if (error.code === "auth/network-request-failed")
-        msg = "No internet connection.";
-      else if (error.code === "auth/too-many-requests")
-        msg = "Too many attempts. Try later.";
-      Alert.alert("Login Failed", msg);
+
+      let message = "Login failed. Please check your credentials.";
+      if (error.code === "auth/invalid-credential") {
+        message = "Invalid email or password. Please try again.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "No account found with this email. Please register first.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password. Please try again.";
+      } else if (error.code === "auth/too-many-requests") {
+        message = "Too many failed attempts. Please try again later.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "No internet connection. Please check your network.";
+      }
+
+      Alert.alert("Login Failed", message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [email, password]);
 
   return (
@@ -83,8 +90,8 @@ export default function LoginScreen() {
         <View style={s.logoBox}>
           <Text style={s.logoText}>L</Text>
         </View>
-        <Text style={s.title}>LUCT Reporting</Text>
-        <Text style={s.subtitle}>Faculty of ICT</Text>
+        <Text style={s.title}>Welcome Back</Text>
+        <Text style={s.subtitle}>Login to LUCT Faculty Reporting System</Text>
 
         <Text style={s.label}>Email Address</Text>
         <TextInput
@@ -106,8 +113,6 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          returnKeyType="done"
-          onSubmitEditing={handleLogin}
         />
 
         <TouchableOpacity
@@ -123,7 +128,9 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-          <Text style={s.link}>Don't have an account? Register here</Text>
+          <Text style={s.link}>
+            Don't have an account? <Text style={s.linkBold}>Register</Text>
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -149,23 +156,12 @@ const s = StyleSheet.create({
   },
   logoText: { color: "#fff", fontSize: 28, fontWeight: "700" },
   title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 4 },
-  subtitle: { fontSize: 13, color: "#6b7280", marginBottom: 24 },
-  infoBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 0.5,
-    borderColor: "#f59e0b",
-    marginBottom: 24,
-    width: "100%",
-  },
-  infoTitle: {
-    color: "#f59e0b",
+  subtitle: {
     fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 4,
+    color: "#6b7280",
+    marginBottom: 32,
+    textAlign: "center",
   },
-  infoText: { color: "#9ca3af", fontSize: 12 },
   label: {
     color: "#9ca3af",
     fontSize: 13,
@@ -189,10 +185,11 @@ const s = StyleSheet.create({
     borderRadius: 12,
     padding: 15,
     alignItems: "center",
-    marginBottom: 16,
     marginTop: 8,
+    marginBottom: 16,
   },
   buttonDisabled: { backgroundColor: "#3730a3" },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  link: { color: "#4f46e5", fontSize: 14 },
+  link: { color: "#6b7280", fontSize: 14, textAlign: "center" },
+  linkBold: { color: "#4f46e5", fontWeight: "600" },
 });

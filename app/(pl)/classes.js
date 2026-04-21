@@ -1,8 +1,9 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
+  Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,243 +11,531 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { getAllClasses } from "../../config/firestore";
+import { useAuth } from "../../config/AuthContext";
+import {
+  addClass,
+  deleteClass,
+  getAvailableCoursesForLecturer,
+  getClassesByLecturer,
+} from "../../config/firestore";
 
-export default function PLClasses() {
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+export default function LecturerClasses() {
+  const { profile } = useAuth();
+
   const [classes, setClasses] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
-  const [selectedDay, setSelectedDay] = useState("All");
-  const days = ["All", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const [dayFilter, setDayFilter] = useState("All");
+
+  const [modal, setModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState({
+    className: "",
+    courseId: "",
+    courseName: "",
+    courseCode: "",
+    venue: "",
+    scheduledTime: "",
+    day: "Monday",
+  });
 
   useEffect(() => {
-    loadClasses();
-  }, []);
+    if (!profile?.id) return;
+    loadData();
+  }, [profile]);
 
-  const loadClasses = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const data = await getAllClasses();
-      setClasses(data);
+      const [c, co] = await Promise.all([
+        getClassesByLecturer(profile.id),
+        getAvailableCoursesForLecturer(profile.id),
+      ]);
+
+      setClasses(c || []);
+      setCourses(co || []);
     } catch (e) {
-      console.log("Error:", e);
+      console.log("Load error:", e);
+      Alert.alert("Error", "Failed to load data");
     }
     setLoading(false);
   };
 
+  const resetForm = () => {
+    setForm({
+      className: "",
+      courseId: "",
+      courseName: "",
+      courseCode: "",
+      venue: "",
+      scheduledTime: "",
+      day: "Monday",
+    });
+  };
+
+  const handleDeleteClass = (classItem) => {
+    Alert.alert(
+      "Delete Class",
+      `Are you sure you want to delete "${classItem.className}"?\n\nThis will also remove all attendance records and enrollments for this class.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteClass(classItem.id);
+              Alert.alert("Success", "Class deleted successfully");
+              loadData();
+            } catch (e) {
+              Alert.alert("Error", "Failed to delete class");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleAdd = useCallback(async () => {
+    if (!form.className.trim()) {
+      Alert.alert("Error", "Enter class name");
+      return;
+    }
+
+    if (!form.courseId) {
+      Alert.alert("Error", "Select a course");
+      return;
+    }
+
+    if (!form.venue.trim()) {
+      Alert.alert("Error", "Enter venue");
+      return;
+    }
+
+    if (!form.scheduledTime.trim()) {
+      Alert.alert("Error", "Enter scheduled time");
+      return;
+    }
+
+    const course = courses.find((c) => c.id === form.courseId);
+    if (!course) {
+      Alert.alert("Error", "Invalid course selected");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await addClass({
+        className: form.className.trim(),
+        courseId: form.courseId,
+        courseName: course.courseName,
+        courseCode: course.courseCode,
+        venue: form.venue.trim(),
+        scheduledTime: form.scheduledTime.trim(),
+        day: form.day,
+        lecturerId: profile.id,
+        lecturerName: profile.name,
+        facultyName: profile.facultyName || "Faculty of ICT",
+      });
+
+      Alert.alert(
+        "Success",
+        "Class created! Students enrolled in this course have been automatically added.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setModal(false);
+              resetForm();
+              loadData();
+            },
+          },
+        ],
+      );
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to add class");
+    } finally {
+      setSaving(false);
+    }
+  }, [form, courses, profile]);
+
   const filtered = classes.filter((c) => {
-    const matchDay = selectedDay === "All" || c.day === selectedDay;
+    const matchDay = dayFilter === "All" || c.day === dayFilter;
     const matchSearch =
       !search ||
-      (c.className || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.courseName || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.lecturerName || "").toLowerCase().includes(search.toLowerCase());
+      c.className?.toLowerCase().includes(search.toLowerCase()) ||
+      c.courseName?.toLowerCase().includes(search.toLowerCase());
+
     return matchDay && matchSearch;
   });
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+    <View style={s.safe}>
+      <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
+        {/* HEADER */}
+        <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Classes</Text>
-          <View style={{ width: 50 }} />
+
+          <Text style={s.title}>My Classes</Text>
+
+          <TouchableOpacity style={s.addBtn} onPress={() => setModal(true)}>
+            <Text style={s.addBtnText}>+ Add</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#4f46e5" }]}>
-              {classes.length}
-            </Text>
-            <Text style={styles.statLabel}>Total Classes</Text>
+        {/* STATS */}
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
+            <Text style={s.statVal}>{classes.length}</Text>
+            <Text style={s.statLabel}>Classes</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#10b981" }]}>
-              {classes.reduce(
-                (a, b) => a + (parseInt(b.totalStudents) || 0),
-                0,
-              )}
-            </Text>
-            <Text style={styles.statLabel}>Total Students</Text>
+
+          <View style={s.statBox}>
+            <Text style={s.statVal}>{courses.length}</Text>
+            <Text style={s.statLabel}>Assigned Courses</Text>
           </View>
         </View>
 
+        {/* SEARCH */}
         <TextInput
-          style={styles.searchInput}
+          style={s.input}
           placeholder="Search classes..."
-          placeholderTextColor="#555b7a"
+          placeholderTextColor="#666"
           value={search}
           onChangeText={setSearch}
         />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.dayScroll}
-        >
-          {days.map((day) => (
+        {/* FILTER BY DAY */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {["All", ...DAYS].map((d) => (
             <TouchableOpacity
-              key={day}
-              style={[
-                styles.dayBtn,
-                selectedDay === day && styles.dayBtnActive,
-              ]}
-              onPress={() => setSelectedDay(day)}
+              key={d}
+              style={[s.dayBtn, dayFilter === d && s.dayBtnActive]}
+              onPress={() => setDayFilter(d)}
             >
-              <Text
-                style={[
-                  styles.dayText,
-                  selectedDay === day && styles.dayTextActive,
-                ]}
-              >
-                {day.slice(0, 3)}
+              <Text style={s.dayText}>
+                {d === "All" ? "All" : d.slice(0, 3)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>Classes ({filtered.length})</Text>
+        {/* LIST */}
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No classes found</Text>
-          </View>
-        ) : (
+        ) : filtered.length === 0 ? null : (
           filtered.map((cls) => (
-            <View key={cls.id} style={styles.classCard}>
-              <View style={styles.classHeader}>
-                <View style={styles.classBadge}>
-                  <Text style={styles.classBadgeText}>{cls.className}</Text>
-                </View>
-                <Text style={styles.classCode}>{cls.courseCode || "N/A"}</Text>
+            <View key={cls.id} style={s.card}>
+              <View style={s.cardHeader}>
+                <Text style={s.badge}>{cls.className}</Text>
+                <TouchableOpacity
+                  onPress={() => handleDeleteClass(cls)}
+                  style={s.deleteBtn}
+                >
+                  <Text style={s.deleteBtnText}>🗑️ Delete</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.courseName}>{cls.courseName || "N/A"}</Text>
-              <View style={styles.details}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>👨‍🏫</Text>
-                  <Text style={styles.detailText}>
-                    {cls.lecturerName || "TBA"}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>📍</Text>
-                  <Text style={styles.detailText}>{cls.venue || "N/A"}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>🕐</Text>
-                  <Text style={styles.detailText}>
-                    {cls.scheduledTime || "N/A"}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>👥</Text>
-                  <Text style={styles.detailText}>
-                    {cls.totalStudents || 0} Students
-                  </Text>
-                </View>
-              </View>
+              <Text style={s.course}>
+                {cls.courseCode} - {cls.courseName}
+              </Text>
+
+              <Text style={s.detail}>📅 {cls.day}</Text>
+              <Text style={s.detail}>🕐 {cls.scheduledTime}</Text>
+              <Text style={s.detail}>📍 {cls.venue}</Text>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(lecturer)/attendance")}
+                style={s.attendanceBtn}
+              >
+                <Text style={s.attendanceText}>Mark Attendance</Text>
+              </TouchableOpacity>
             </View>
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      {/* MODAL - Create Class */}
+      <Modal visible={modal} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <ScrollView>
+            <View style={s.modal}>
+              <Text style={s.modalTitle}>Create New Class</Text>
+              <Text style={s.modalSubtitle}>
+                Select a course and fill in the details
+              </Text>
+
+              <Text style={s.label}>Class Name</Text>
+              <TextInput
+                style={s.input}
+                placeholder="e.g., Monday Morning Session"
+                placeholderTextColor="#555b7a"
+                value={form.className}
+                onChangeText={(v) => setForm((p) => ({ ...p, className: v }))}
+              />
+
+              <Text style={s.label}>Select Course</Text>
+
+              {courses.length === 0 ? (
+                <View style={s.noCoursesBox}>
+                  <Text style={s.noCoursesIcon}>📚</Text>
+                  <Text style={s.noCoursesText}>Loading courses...</Text>
+                </View>
+              ) : (
+                courses.map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      s.courseItem,
+                      form.courseId === c.id && s.courseSelected,
+                    ]}
+                    onPress={() =>
+                      setForm((p) => ({
+                        ...p,
+                        courseId: c.id,
+                        courseName: c.courseName,
+                        courseCode: c.courseCode,
+                      }))
+                    }
+                  >
+                    <View>
+                      <Text style={s.courseCodeText}>{c.courseCode}</Text>
+                      <Text style={s.courseNameText}>{c.courseName}</Text>
+                      <Text style={s.courseStudentsText}>
+                        👥 {c.studentIds?.length || 0} students enrolled
+                      </Text>
+                    </View>
+                    {form.courseId === c.id && (
+                      <Text style={s.checkMark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+
+              <Text style={s.label}>Day of Class</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {DAYS.map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[s.dayBtn, form.day === d && s.dayBtnActive]}
+                    onPress={() => setForm((p) => ({ ...p, day: d }))}
+                  >
+                    <Text style={s.dayText}>{d.slice(0, 3)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={s.label}>Time</Text>
+              <TextInput
+                style={s.input}
+                placeholder="e.g., 09:00 AM - 11:00 AM"
+                placeholderTextColor="#555b7a"
+                value={form.scheduledTime}
+                onChangeText={(v) =>
+                  setForm((p) => ({ ...p, scheduledTime: v }))
+                }
+              />
+
+              <Text style={s.label}>Venue</Text>
+              <TextInput
+                style={s.input}
+                placeholder="e.g., Room 301, ICT Building"
+                placeholderTextColor="#555b7a"
+                value={form.venue}
+                onChangeText={(v) => setForm((p) => ({ ...p, venue: v }))}
+              />
+
+              <View style={s.row}>
+                <TouchableOpacity
+                  style={s.cancel}
+                  onPress={() => {
+                    setModal(false);
+                    resetForm();
+                  }}
+                >
+                  <Text style={s.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[s.save, saving && s.saveDisabled]}
+                  onPress={handleAdd}
+                  disabled={saving}
+                >
+                  <Text style={s.saveText}>
+                    {saving ? "Creating..." : "Create Class"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+/* ───────────── STYLES ───────────── */
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0a0f2c" },
-  container: { flex: 1, padding: 20 },
+  container: { padding: 20 },
+
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 24,
-    marginTop: 16,
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 20,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
+
+  back: { color: "#4f46e5", fontSize: 16 },
+  title: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+
+  addBtn: { backgroundColor: "#4f46e5", padding: 10, borderRadius: 8 },
+  addBtnText: { color: "#fff", fontWeight: "600" },
+
+  statsRow: { flexDirection: "row", gap: 10, marginBottom: 15 },
   statBox: {
     flex: 1,
     backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 16,
+    padding: 15,
+    borderRadius: 10,
     alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
   },
-  statValue: { fontSize: 28, fontWeight: "700" },
-  statLabel: { color: "#6b7280", fontSize: 12, marginTop: 4 },
-  searchInput: {
+  statVal: { color: "#fff", fontSize: 20, fontWeight: "bold" },
+  statLabel: { color: "#aaa", fontSize: 12, marginTop: 4 },
+
+  input: {
     backgroundColor: "#1a1f3c",
-    borderRadius: 12,
     padding: 12,
+    borderRadius: 10,
     color: "#fff",
-    marginBottom: 14,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    fontSize: 14,
+    marginVertical: 8,
   },
-  dayScroll: { marginBottom: 20 },
+
   dayBtn: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    paddingHorizontal: 12,
+    backgroundColor: "#1a1f3c",
     marginRight: 8,
+    borderRadius: 8,
+  },
+  dayBtnActive: { backgroundColor: "#4f46e5" },
+  dayText: { color: "#fff", fontSize: 12 },
+
+  card: {
     backgroundColor: "#1a1f3c",
+    padding: 15,
+    borderRadius: 12,
+    marginTop: 10,
   },
-  dayBtnActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
-  dayText: { color: "#6b7280", fontSize: 13, fontWeight: "500" },
-  dayTextActive: { color: "#fff" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  emptyBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  emptyText: { color: "#6b7280", fontSize: 14 },
-  classCard: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  classHeader: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
   },
-  classBadge: {
-    backgroundColor: "#4f46e5",
-    borderRadius: 8,
-    paddingVertical: 4,
+
+  badge: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  deleteBtn: {
+    backgroundColor: "#ef4444",
     paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  classBadgeText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  classCode: { color: "#6b7280", fontSize: 13 },
-  courseName: {
+  deleteBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  course: { color: "#aaa", marginBottom: 8 },
+  detail: { color: "#888", marginBottom: 4 },
+
+  attendanceBtn: {
+    marginTop: 10,
+    backgroundColor: "#4f46e5",
+    padding: 8,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  attendanceText: { color: "#fff", fontWeight: "600" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "flex-end",
+  },
+
+  modal: {
+    backgroundColor: "#1a1f3c",
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "90%",
+  },
+
+  modalTitle: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 4,
   },
-  details: { gap: 6 },
-  detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  detailIcon: { fontSize: 14 },
-  detailText: { color: "#9ca3af", fontSize: 13 },
+  modalSubtitle: { color: "#6b7280", fontSize: 12, marginBottom: 16 },
+
+  label: { color: "#aaa", marginTop: 12, marginBottom: 4, fontSize: 13 },
+
+  noCoursesBox: {
+    backgroundColor: "#0a0f2c",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  noCoursesIcon: { fontSize: 40, marginBottom: 10 },
+  noCoursesText: { color: "#fff", fontWeight: "600", marginBottom: 4 },
+
+  courseItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#0a0f2c",
+    marginTop: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2a2f5c",
+  },
+  courseSelected: { borderColor: "#4f46e5", backgroundColor: "#1e2350" },
+  courseCodeText: { color: "#4f46e5", fontSize: 12, fontWeight: "600" },
+  courseNameText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  courseStudentsText: { color: "#6b7280", fontSize: 11, marginTop: 4 },
+  checkMark: { color: "#10b981", fontSize: 18, fontWeight: "bold" },
+
+  row: { flexDirection: "row", gap: 10, marginTop: 20, marginBottom: 10 },
+
+  cancel: {
+    flex: 1,
+    backgroundColor: "#2a2f5c",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  cancelText: { color: "#fff" },
+
+  save: {
+    flex: 1,
+    backgroundColor: "#4f46e5",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  saveDisabled: { backgroundColor: "#3730a3" },
+  saveText: { color: "#fff", fontWeight: "600" },
 });

@@ -16,7 +16,10 @@ import {
 } from "react-native";
 import { auth } from "../../config/auth";
 import { db } from "../../config/firebase";
-import { enrollNewStudentInAllClasses } from "../../config/firestore";
+import {
+  addStudentToAllCourses,
+  enrollNewStudentInAllClasses,
+} from "../../config/firestore";
 
 const ROLES = [
   {
@@ -53,48 +56,69 @@ export default function RegisterScreen() {
   const [role, setRole] = useState("student");
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = useCallback(async () => {
+  const validateForm = () => {
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter your full name");
-      return;
+      Alert.alert("Validation Error", "Please enter your full name");
+      return false;
     }
     if (!email.trim() || !email.includes("@")) {
-      Alert.alert("Error", "Please enter a valid email");
-      return;
+      Alert.alert("Validation Error", "Please enter a valid email address");
+      return false;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
-      return;
+      Alert.alert("Validation Error", "Password must be at least 6 characters");
+      return false;
     }
     if (password !== confirm) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
+      Alert.alert("Validation Error", "Passwords do not match");
+      return false;
     }
+    return true;
+  };
+
+  const handleRegister = useCallback(async () => {
+    if (!validateForm()) return;
+
     setLoading(true);
     try {
+      // Create Firebase Auth user
       const cred = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
         password,
       );
       const uid = cred.user.uid;
+
+      // Save user to Firestore
       await setDoc(doc(db, "users", uid), {
         name: name.trim(),
         email: email.trim(),
         role,
         facultyName: "Faculty of ICT",
         createdAt: new Date(),
+        status: "Active",
       });
+
+      // Auto-enroll students in all existing classes AND courses
       if (role === "student") {
         try {
+          // Enroll in all existing classes
           await enrollNewStudentInAllClasses(uid, name.trim(), email.trim());
+
+          // Also add student to all existing courses
+          await addStudentToAllCourses(uid, name.trim(), email.trim());
+
+          console.log("Student auto-enrolled successfully");
         } catch (e) {
           console.log("Auto-enroll error (non-critical):", e);
         }
       }
+
       const roleLabel = ROLES.find((r) => r.key === role)?.label || role;
+
+      // Success alert with clear next steps
       Alert.alert(
-        "Account Created! ✅",
+        "Registration Successful! ✅",
         `Welcome ${name.trim()}!\n\nRole: ${roleLabel}\n\nYou can now login with your email and password.`,
         [
           {
@@ -103,20 +127,31 @@ export default function RegisterScreen() {
           },
         ],
       );
+
+      // Reset form
+      setName("");
+      setEmail("");
+      setPassword("");
+      setConfirm("");
+      setRole("student");
     } catch (error) {
       console.log("Register error:", error.code, error.message);
-      let msg = "Registration failed. Please try again.";
-      if (error.code === "auth/email-already-in-use")
-        msg = "This email is already registered. Please login.";
-      else if (error.code === "auth/invalid-email")
-        msg = "Invalid email address.";
-      else if (error.code === "auth/weak-password")
-        msg = "Password is too weak. Use at least 6 characters.";
-      else if (error.code === "auth/network-request-failed")
-        msg = "No internet connection.";
-      Alert.alert("Registration Failed", msg);
+
+      let message = "Registration failed. Please try again.";
+      if (error.code === "auth/email-already-in-use") {
+        message = "This email is already registered. Please login instead.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "Invalid email address format.";
+      } else if (error.code === "auth/weak-password") {
+        message = "Password is too weak. Use at least 6 characters.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "No internet connection. Please check your network.";
+      }
+
+      Alert.alert("Registration Failed", message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [name, email, password, confirm, role]);
 
   return (

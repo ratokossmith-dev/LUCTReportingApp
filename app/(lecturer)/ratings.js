@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useAuth } from "../../config/AuthContext";
 import { getRatingsByLecturer } from "../../config/firestore";
+import { exportToExcel, formatRatingsForExcel } from "../../utils/exportExcel";
 
 export default function LecturerRatings() {
   const { profile } = useAuth();
@@ -29,6 +30,15 @@ export default function LecturerRatings() {
     })();
   }, [profile]);
 
+  const handleExport = async () => {
+    const exportData = formatRatingsForExcel(ratings);
+    await exportToExcel(
+      exportData,
+      `My_Ratings_${new Date().toISOString().split("T")[0]}`,
+      "Ratings",
+    );
+  };
+
   const avg =
     ratings.length > 0
       ? (ratings.reduce((a, b) => a + b.rating, 0) / ratings.length).toFixed(1)
@@ -42,7 +52,9 @@ export default function LecturerRatings() {
             <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
           <Text style={s.title}>My Ratings</Text>
-          <View style={{ width: 50 }} />
+          <TouchableOpacity style={s.exportBtn} onPress={handleExport}>
+            <Text style={s.exportBtnText}>📎 Export</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={s.overallCard}>
@@ -113,15 +125,7 @@ export default function LecturerRatings() {
         <Text style={s.section}>Student Reviews ({ratings.length})</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
-        ) : ratings.length === 0 ? (
-          <View style={s.empty}>
-            <Text style={s.emptyIcon}>⭐</Text>
-            <Text style={s.emptyTitle}>No ratings yet</Text>
-            <Text style={s.emptyText}>
-              Students will rate you after attending your classes.
-            </Text>
-          </View>
-        ) : (
+        ) : ratings.length === 0 ? null : (
           ratings.map((item, i) => (
             <View key={item.id || i} style={s.reviewCard}>
               <View
@@ -180,6 +184,17 @@ const s = StyleSheet.create({
   },
   back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
   title: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  exportBtn: {
+    backgroundColor: "#10b981",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  exportBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   overallCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
@@ -192,22 +207,6 @@ const s = StyleSheet.create({
   overallVal: { color: "#f59e0b", fontSize: 56, fontWeight: "700" },
   overallLabel: { color: "#6b7280", fontSize: 13 },
   section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
-  empty: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 28,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  emptyText: { color: "#6b7280", fontSize: 12, textAlign: "center" },
   reviewCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,

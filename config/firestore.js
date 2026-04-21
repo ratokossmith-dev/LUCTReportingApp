@@ -2,11 +2,13 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -38,6 +40,32 @@ export const getAllRegisteredStudents = async () => {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
+// ───────────────── DELETE CLASS ─────────────────
+
+export const deleteClass = async (classId) => {
+  try {
+    // 1. Delete all enrollments for this class
+    const enrollments = await getEnrollmentsByClass(classId);
+    for (const enrollment of enrollments) {
+      await deleteDoc(doc(db, "enrollments", enrollment.id));
+    }
+
+    // 2. Delete all attendance records for this class
+    const attendance = await getAttendanceByClass(classId);
+    for (const record of attendance) {
+      await deleteDoc(doc(db, "attendance", record.id));
+    }
+
+    // 3. Delete the class itself
+    await deleteDoc(doc(db, "classes", classId));
+
+    return true;
+  } catch (error) {
+    console.log("Delete class error:", error);
+    throw error;
+  }
+};
+
 // ───────────────── LECTURER MANAGEMENT (PL SIDE) ─────────────────
 
 // Helper function to generate temporary password
@@ -54,19 +82,13 @@ const generateTempPassword = () => {
 // Add lecturer with Firebase Auth account
 export const addLecturer = async (lecturerData) => {
   try {
-    // Generate a temporary password
     const tempPassword = generateTempPassword();
-
-    // Create Firebase Auth user
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       lecturerData.email.trim(),
       tempPassword,
     );
-
     const uid = userCredential.user.uid;
-
-    // Save to Firestore
     await setDoc(doc(db, "users", uid), {
       name: lecturerData.name.trim(),
       email: lecturerData.email.trim(),
@@ -77,7 +99,6 @@ export const addLecturer = async (lecturerData) => {
       createdBy: "pl",
       tempPassword: tempPassword,
     });
-
     return {
       success: true,
       uid,
@@ -177,6 +198,185 @@ export const attachLecturerAndStudentsToCourse = async (
   });
 };
 
+// ───────────────── STUDENT COURSE ENROLLMENT ─────────────────
+
+// Add student to all existing courses (for new registrations)
+export const addStudentToAllCourses = async (
+  studentId,
+  studentName,
+  studentEmail,
+) => {
+  try {
+    const allCourses = await getAllCourses();
+
+    for (const course of allCourses) {
+      const currentStudentIds = course.studentIds || [];
+      if (!currentStudentIds.includes(studentId)) {
+        await updateDoc(doc(db, "courses", course.id), {
+          studentIds: [...currentStudentIds, studentId],
+          updatedAt: serverTimestamp(),
+        });
+
+        // Also enroll in all classes of this course
+        await enrollStudentInCourseClasses(
+          course.id,
+          studentId,
+          studentName,
+          studentEmail,
+        );
+      }
+    }
+    console.log(`Student ${studentName} added to ${allCourses.length} courses`);
+  } catch (error) {
+    console.log("Add student to all courses error:", error);
+  }
+};
+
+// Add a student to a specific course
+export const addStudentToCourse = async (
+  courseId,
+  studentId,
+  studentName,
+  studentEmail,
+) => {
+  try {
+    const courseRef = doc(db, "courses", courseId);
+    const courseSnap = await getDoc(courseRef);
+
+    if (courseSnap.exists()) {
+      const course = courseSnap.data();
+      const currentStudentIds = course.studentIds || [];
+
+      if (!currentStudentIds.includes(studentId)) {
+        await updateDoc(courseRef, {
+          studentIds: [...currentStudentIds, studentId],
+          updatedAt: serverTimestamp(),
+        });
+
+        await enrollStudentInCourseClasses(
+          courseId,
+          studentId,
+          studentName,
+          studentEmail,
+        );
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.log("Add student to course error:", error);
+    throw error;
+  }
+};
+
+// Enroll student in all classes of a specific course
+export const enrollStudentInCourseClasses = async (
+  courseId,
+  studentId,
+  studentName,
+  studentEmail,
+) => {
+  try {
+    const q = query(
+      collection(db, "classes"),
+      where("courseId", "==", courseId),
+    );
+    const classesSnap = await getDocs(q);
+
+    for (const classDoc of classesSnap.docs) {
+      const classData = classDoc.data();
+
+      const existing = await getDocs(
+        query(
+          collection(db, "enrollments"),
+          where("studentId", "==", studentId),
+          where("classId", "==", classDoc.id),
+        ),
+      );
+
+      if (existing.empty) {
+        await addDoc(collection(db, "enrollments"), {
+          studentId,
+          studentName,
+          studentEmail,
+          classId: classDoc.id,
+          className: classData.className,
+          courseId: courseId,
+          courseName: classData.courseName,
+          courseCode: classData.courseCode,
+          lecturerId: classData.lecturerId,
+          lecturerName: classData.lecturerName,
+          enrolledAt: serverTimestamp(),
+        });
+      }
+    }
+  } catch (error) {
+    console.log("Enroll in course classes error:", error);
+  }
+};
+
+// Get all available courses for a student (courses they are not yet enrolled in)
+export const getAvailableCoursesForStudent = async (studentId) => {
+  try {
+    const allCourses = await getAllCourses();
+    const studentCourses = await getStudentCourses(studentId);
+    const enrolledCourseIds = studentCourses.map((c) => c.id);
+    return allCourses.filter(
+      (course) => !enrolledCourseIds.includes(course.id),
+    );
+  } catch (error) {
+    console.log("Get available courses error:", error);
+    return [];
+  }
+};
+
+// Lecturer adds a student to a course
+export const lecturerAddStudentToCourse = async (
+  courseId,
+  studentId,
+  lecturerId,
+) => {
+  try {
+    const courseSnap = await getDoc(doc(db, "courses", courseId));
+    if (!courseSnap.exists()) {
+      throw new Error("Course not found");
+    }
+
+    const course = courseSnap.data();
+    if (!course.lecturerIds || !course.lecturerIds.includes(lecturerId)) {
+      throw new Error("You are not authorized to add students to this course");
+    }
+
+    const studentSnap = await getDoc(doc(db, "users", studentId));
+    if (!studentSnap.exists()) {
+      throw new Error("Student not found");
+    }
+
+    const student = studentSnap.data();
+    await addStudentToCourse(courseId, studentId, student.name, student.email);
+    return true;
+  } catch (error) {
+    console.log("Lecturer add student error:", error);
+    throw error;
+  }
+};
+
+// Get students not enrolled in a specific course
+export const getStudentsNotInCourse = async (courseId) => {
+  try {
+    const courseSnap = await getDoc(doc(db, "courses", courseId));
+    const course = courseSnap.data();
+    const enrolledStudentIds = course.studentIds || [];
+    const allStudents = await getAllStudents();
+    return allStudents.filter(
+      (student) => !enrolledStudentIds.includes(student.id),
+    );
+  } catch (error) {
+    console.log("Get students not in course error:", error);
+    return [];
+  }
+};
+
 // ───────────────── STUDENT SPECIFIC FUNCTIONS ─────────────────
 
 export const getStudentCourses = async (studentId) => {
@@ -248,7 +448,6 @@ export const getClassesByStudent = async (studentId) => {
       classes.push({ id: classSnap.id, ...classSnap.data() });
     }
   }
-
   return classes;
 };
 
@@ -409,7 +608,6 @@ export const getEnrolledStudentsWithDetails = async (classId) => {
       });
     }
   }
-
   return students;
 };
 
@@ -552,7 +750,6 @@ export const updateReportStatus = async (reportId, status, feedback = "") => {
   });
 };
 
-// 🔥 CRITICAL: Function used by PRLReports.js
 export const addFeedbackToReport = async (reportId, feedback) => {
   await updateDoc(doc(db, "reports", reportId), {
     prlFeedback: feedback,
@@ -561,7 +758,7 @@ export const addFeedbackToReport = async (reportId, feedback) => {
   });
 };
 
-// ───────────────── RATINGS (ENHANCED) ─────────────────
+// ───────────────── RATINGS ─────────────────
 
 export const getRatingsByLecturer = async (lecturerId) => {
   const q = query(

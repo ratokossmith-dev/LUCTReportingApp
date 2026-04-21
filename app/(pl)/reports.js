@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -11,12 +12,14 @@ import {
   View,
 } from "react-native";
 import { getAllReports } from "../../config/firestore";
+import { exportToExcel, formatReportsForExcel } from "../../utils/exportExcel";
 
 export default function PLReports() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("All");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadReports();
@@ -30,6 +33,28 @@ export default function PLReports() {
       console.log("Error:", e);
     }
     setLoading(false);
+  };
+
+  const handleExport = async () => {
+    if (filtered.length === 0) {
+      Alert.alert("No Data", "There are no reports to export.");
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const exportData = formatReportsForExcel(filtered);
+      await exportToExcel(
+        exportData,
+        `Reports_${new Date().toISOString().split("T")[0]}`,
+        "Reports",
+      );
+    } catch (error) {
+      console.log("Export error:", error);
+      Alert.alert("Export Failed", error.message || "Something went wrong");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filtered = reports.filter((r) => {
@@ -50,7 +75,15 @@ export default function PLReports() {
             <Text style={styles.backBtn}>‹ Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Reports</Text>
-          <View style={{ width: 50 }} />
+          <TouchableOpacity
+            style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+            onPress={handleExport}
+            disabled={exporting}
+          >
+            <Text style={styles.exportBtnText}>
+              {exporting ? "⏳ Exporting..." : "📎 Export"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.statsRow}>
@@ -111,11 +144,7 @@ export default function PLReports() {
         <Text style={styles.sectionTitle}>Reports ({filtered.length})</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>No reports found</Text>
-          </View>
-        ) : (
+        ) : filtered.length === 0 ? null : (
           filtered.map((report) => (
             <View key={report.id} style={styles.reportCard}>
               <View style={styles.reportHeader}>
@@ -162,11 +191,7 @@ export default function PLReports() {
                   <Text style={styles.feedbackLabel}>PRL Feedback:</Text>
                   <Text style={styles.feedbackText}>{report.prlFeedback}</Text>
                 </View>
-              ) : (
-                <View style={styles.noFeedbackBox}>
-                  <Text style={styles.noFeedbackText}>No PRL feedback yet</Text>
-                </View>
-              )}
+              ) : null}
             </View>
           ))
         )}
@@ -187,6 +212,21 @@ const styles = StyleSheet.create({
   },
   backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  exportBtn: {
+    backgroundColor: "#10b981",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  exportBtnDisabled: {
+    backgroundColor: "#6b7280",
+    opacity: 0.7,
+  },
+  exportBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   statBox: {
     flex: 1,
@@ -228,15 +268,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 12,
   },
-  emptyBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  emptyText: { color: "#6b7280", fontSize: 14 },
   reportCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
@@ -291,13 +322,4 @@ const styles = StyleSheet.create({
   },
   feedbackLabel: { color: "#10b981", fontSize: 11, marginBottom: 4 },
   feedbackText: { color: "#9ca3af", fontSize: 13 },
-  noFeedbackBox: {
-    backgroundColor: "#0a0f2c",
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    alignItems: "center",
-  },
-  noFeedbackText: { color: "#6b7280", fontSize: 12 },
 });

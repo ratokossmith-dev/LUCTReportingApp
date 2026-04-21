@@ -3,6 +3,7 @@ import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +13,8 @@ import {
 import { auth } from "../../config/auth";
 import { useAuth } from "../../config/AuthContext";
 import {
+  addStudentToCourse,
+  getAvailableCoursesForStudent,
   getStudentAttendance,
   getStudentCourses,
   getStudentRatings,
@@ -20,28 +23,52 @@ import {
 export default function StudentDashboard() {
   const { profile } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [availableCourses, setAvailableCourses] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     if (!profile?.id) return;
-    (async () => {
-      try {
-        const [c, a, r] = await Promise.all([
-          getStudentCourses(profile.id),
-          getStudentAttendance(profile.id),
-          getStudentRatings(profile.id),
-        ]);
-        setCourses(c);
-        setAttendance(a);
-        setRatings(r);
-      } catch (e) {
-        console.log("Dashboard error:", e);
-      }
-      setLoading(false);
-    })();
+    loadData();
   }, [profile]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [c, a, r, avail] = await Promise.all([
+        getStudentCourses(profile.id),
+        getStudentAttendance(profile.id),
+        getStudentRatings(profile.id),
+        getAvailableCoursesForStudent(profile.id),
+      ]);
+      setCourses(c);
+      setAttendance(a);
+      setRatings(r);
+      setAvailableCourses(avail);
+    } catch (e) {
+      console.log("Dashboard error:", e);
+    }
+    setLoading(false);
+  };
+
+  const joinCourse = async (courseId, courseName) => {
+    setJoining(true);
+    try {
+      await addStudentToCourse(
+        courseId,
+        profile.id,
+        profile.name,
+        profile.email,
+      );
+      Alert.alert("Success", `You have successfully joined ${courseName}!`);
+      loadData(); // Refresh the lists
+    } catch (e) {
+      Alert.alert("Error", "Failed to join course. Please try again.");
+    }
+    setJoining(false);
+  };
 
   const present = attendance.filter((a) => a.present).length;
   const rate =
@@ -128,8 +155,7 @@ export default function StudentDashboard() {
             <Text style={s.emptyIcon}>📚</Text>
             <Text style={s.emptyTitle}>No courses yet</Text>
             <Text style={s.emptyText}>
-              You will be automatically enrolled when a lecturer creates a
-              class.
+              Join available courses below to get started!
             </Text>
           </View>
         ) : (
@@ -151,6 +177,43 @@ export default function StudentDashboard() {
               </View>
             ))}
           </View>
+        )}
+
+        {/* Available Courses to Join */}
+        {availableCourses.length > 0 && (
+          <>
+            <Text style={s.section}>Available Courses to Join</Text>
+            <View style={s.card}>
+              {availableCourses.map((course, i) => (
+                <View
+                  key={course.id}
+                  style={[
+                    s.row,
+                    i !== availableCourses.length - 1 && s.rowBorder,
+                  ]}
+                >
+                  <View style={s.codeBadge}>
+                    <Text style={s.codeText}>{course.courseCode || "N/A"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.courseName}>
+                      {course.courseName || "N/A"}
+                    </Text>
+                    <Text style={s.courseSub}>
+                      Lecturers: {course.lecturerIds?.length || 0} assigned
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={s.joinBtn}
+                    onPress={() => joinCourse(course.id, course.courseName)}
+                    disabled={joining}
+                  >
+                    <Text style={s.joinBtnText}>Join</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </>
         )}
 
         <Text style={s.section}>Quick Actions</Text>
@@ -259,6 +322,13 @@ const s = StyleSheet.create({
   codeText: { color: "#4f46e5", fontSize: 11, fontWeight: "700" },
   courseName: { color: "#fff", fontSize: 13, fontWeight: "600" },
   courseSub: { color: "#6b7280", fontSize: 11, marginTop: 2 },
+  joinBtn: {
+    backgroundColor: "#10b981",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  joinBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   menuList: { gap: 10, marginBottom: 28 },
   menuItem: {
     backgroundColor: "#1a1f3c",

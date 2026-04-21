@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -21,6 +22,7 @@ export default function StudentMonitoring() {
   const [classes, setClasses] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -55,6 +57,21 @@ export default function StudentMonitoring() {
         : 0;
     return { ...cls, classPresent, classTotalAtt: classAtt.length, classRate };
   });
+
+  const filteredClassStats = classStats.filter(
+    (cls) =>
+      !search ||
+      cls.className?.toLowerCase().includes(search.toLowerCase()) ||
+      cls.courseName?.toLowerCase().includes(search.toLowerCase()) ||
+      cls.lecturerName?.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const filteredCourses = courses.filter(
+    (c) =>
+      !search ||
+      c.courseName?.toLowerCase().includes(search.toLowerCase()) ||
+      c.courseCode?.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <View style={s.safe}>
@@ -94,96 +111,93 @@ export default function StudentMonitoring() {
               </View>
             </View>
 
+            <TextInput
+              style={s.searchInput}
+              placeholder="Search classes or courses..."
+              placeholderTextColor="#555b7a"
+              value={search}
+              onChangeText={setSearch}
+            />
+
             <Text style={s.section}>My Classes & Attendance</Text>
-            {classStats.length === 0 ? (
-              <View style={s.empty}>
-                <Text style={s.emptyIcon}>🏫</Text>
-                <Text style={s.emptyTitle}>No classes yet</Text>
-                <Text style={s.emptyText}>
-                  You will be enrolled automatically when a lecturer creates a
-                  class.
-                </Text>
-              </View>
-            ) : (
-              classStats.map((cls) => {
-                const color =
-                  cls.classRate >= 90
-                    ? "#10b981"
-                    : cls.classRate >= 75
-                      ? "#f59e0b"
-                      : "#ef4444";
-                return (
-                  <View key={cls.id} style={s.classCard}>
-                    <View style={s.classHeader}>
-                      <View style={s.classBadge}>
-                        <Text style={s.classBadgeText}>{cls.className}</Text>
+            {filteredClassStats.length === 0
+              ? null
+              : filteredClassStats.map((cls) => {
+                  const color =
+                    cls.classRate >= 90
+                      ? "#10b981"
+                      : cls.classRate >= 75
+                        ? "#f59e0b"
+                        : "#ef4444";
+                  return (
+                    <View key={cls.id} style={s.classCard}>
+                      <View style={s.classHeader}>
+                        <View style={s.classBadge}>
+                          <Text style={s.classBadgeText}>{cls.className}</Text>
+                        </View>
+                        <Text style={[s.classRate, { color }]}>
+                          {cls.classRate}%
+                        </Text>
                       </View>
-                      <Text style={[s.classRate, { color }]}>
-                        {cls.classRate}%
+                      <Text style={s.courseName}>{cls.courseName}</Text>
+                      <Text style={s.lecturerName}>
+                        👨‍🏫 {cls.lecturerName || "TBA"}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          gap: 8,
+                          marginBottom: 10,
+                        }}
+                      >
+                        {cls.day ? (
+                          <Text style={s.detail}>📅 {cls.day}</Text>
+                        ) : null}
+                        {cls.scheduledTime ? (
+                          <Text style={s.detail}>🕐 {cls.scheduledTime}</Text>
+                        ) : null}
+                        {cls.venue ? (
+                          <Text style={s.detail}>📍 {cls.venue}</Text>
+                        ) : null}
+                      </View>
+                      <View style={s.progressBar}>
+                        <View
+                          style={[
+                            s.progressFill,
+                            {
+                              width: `${cls.classRate}%`,
+                              backgroundColor: color,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={s.attStat}>
+                        {cls.classPresent}/{cls.classTotalAtt} sessions attended
                       </Text>
                     </View>
-                    <Text style={s.courseName}>{cls.courseName}</Text>
-                    <Text style={s.lecturerName}>
-                      👨‍🏫 {cls.lecturerName || "TBA"}
-                    </Text>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        gap: 8,
-                        marginBottom: 10,
-                      }}
-                    >
-                      {cls.day ? (
-                        <Text style={s.detail}>📅 {cls.day}</Text>
-                      ) : null}
-                      {cls.scheduledTime ? (
-                        <Text style={s.detail}>🕐 {cls.scheduledTime}</Text>
-                      ) : null}
-                      {cls.venue ? (
-                        <Text style={s.detail}>📍 {cls.venue}</Text>
-                      ) : null}
-                    </View>
-                    <View style={s.progressBar}>
-                      <View
-                        style={[
-                          s.progressFill,
-                          {
-                            width: `${cls.classRate}%`,
-                            backgroundColor: color,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={s.attStat}>
-                      {cls.classPresent}/{cls.classTotalAtt} sessions attended
-                    </Text>
-                  </View>
-                );
-              })
-            )}
+                  );
+                })}
 
             <Text style={s.section}>Enrolled Courses</Text>
-            {courses.length === 0 ? (
-              <View style={s.empty}>
-                <Text style={s.emptyText}>No courses enrolled yet.</Text>
-              </View>
-            ) : (
-              courses.map((c, i) => (
-                <View key={c.id || i} style={s.courseCard}>
-                  <View style={s.courseCodeBadge}>
-                    <Text style={s.courseCodeText}>
-                      {c.courseCode || "N/A"}
+            {filteredCourses.length === 0
+              ? null
+              : filteredCourses.map((c, i) => (
+                  <View key={c.id || i} style={s.courseCard}>
+                    <View style={s.courseCodeBadge}>
+                      <Text style={s.courseCodeText}>
+                        {c.courseCode || "N/A"}
+                      </Text>
+                    </View>
+                    <Text style={s.courseCardName}>
+                      {c.courseName || "N/A"}
+                    </Text>
+                    <Text style={s.courseCardSub}>
+                      Lecturer: {c.lecturerName || "TBA"} • Semester{" "}
+                      {c.semester || "N/A"}
                     </Text>
                   </View>
-                  <Text style={s.courseCardName}>{c.courseName || "N/A"}</Text>
-                  <Text style={s.courseCardSub}>
-                    Lecturer: {c.lecturerName || "TBA"} • Semester{" "}
-                    {c.semester || "N/A"}
-                  </Text>
-                </View>
-              ))
-            )}
+                ))}
           </>
         )}
       </ScrollView>
@@ -214,24 +228,17 @@ const s = StyleSheet.create({
   },
   statVal: { fontSize: 26, fontWeight: "700", marginBottom: 4 },
   statLabel: { color: "#6b7280", fontSize: 11 },
-  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
-  empty: {
+  searchInput: {
     backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 28,
-    alignItems: "center",
+    borderRadius: 12,
+    padding: 12,
+    color: "#fff",
+    marginBottom: 16,
     borderWidth: 0.5,
     borderColor: "#2a2f5c",
-    marginBottom: 16,
+    fontSize: 14,
   },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  emptyText: { color: "#6b7280", fontSize: 12, textAlign: "center" },
+  section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
   classCard: {
     backgroundColor: "#1a1f3c",
     borderRadius: 14,

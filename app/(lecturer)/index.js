@@ -97,6 +97,12 @@ export default function LecturerDashboard() {
       sub: "See student feedback & ratings",
       route: "/(lecturer)/ratings",
     },
+    {
+      icon: "👥",
+      title: "Manage Students",
+      sub: "Add students to your courses",
+      route: "/(lecturer)/manage-students",
+    },
   ];
 
   return (
@@ -202,15 +208,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  noticeBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 0.5,
-    borderColor: "#4f46e5",
-    marginBottom: 24,
-  },
-  noticeText: { color: "#9ca3af", fontSize: 12, lineHeight: 18 },
   section: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   statCard: {

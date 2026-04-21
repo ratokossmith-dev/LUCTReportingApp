@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { addFeedbackToReport, getAllReports } from "../../config/firestore";
+import { exportToExcel, formatReportsForExcel } from "../../utils/exportExcel";
 
 export default function PRLReports() {
   const [reports, setReports] = useState([]);
@@ -35,6 +36,15 @@ export default function PRLReports() {
       console.log("Reports load error:", e);
     }
     setLoading(false);
+  };
+
+  const handleExport = async () => {
+    const exportData = formatReportsForExcel(filtered);
+    await exportToExcel(
+      exportData,
+      `Reports_${new Date().toISOString().split("T")[0]}`,
+      "Reports",
+    );
   };
 
   const handleFeedback = useCallback(async () => {
@@ -85,7 +95,9 @@ export default function PRLReports() {
             <Text style={s.back}>‹ Back</Text>
           </TouchableOpacity>
           <Text style={s.title}>Reports</Text>
-          <View style={{ width: 50 }} />
+          <TouchableOpacity style={s.exportBtn} onPress={handleExport}>
+            <Text style={s.exportBtnText}>📎 Export</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={s.statsRow}>
@@ -138,15 +150,7 @@ export default function PRLReports() {
         <Text style={s.section}>Reports ({filtered.length})</Text>
         {loading ? (
           <ActivityIndicator color="#4f46e5" />
-        ) : filtered.length === 0 ? (
-          <View style={s.empty}>
-            <Text style={s.emptyText}>
-              {filter === "Pending"
-                ? "✅ No pending reports!"
-                : "No reports found"}
-            </Text>
-          </View>
-        ) : (
+        ) : filtered.length === 0 ? null : (
           filtered.map((r) => (
             <View key={r.id} style={s.card}>
               <View style={s.cardHeader}>
@@ -275,6 +279,17 @@ const s = StyleSheet.create({
   },
   back: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
   title: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  exportBtn: {
+    backgroundColor: "#10b981",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  exportBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   statBox: {
     flex: 1,
@@ -310,15 +325,6 @@ const s = StyleSheet.create({
   filterText: { color: "#6b7280", fontSize: 13 },
   filterTextActive: { color: "#fff" },
   section: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 12 },
-  empty: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  emptyText: { color: "#6b7280", fontSize: 14 },
   card: {
     backgroundColor: "#1a1f3c",
     borderRadius: 16,
