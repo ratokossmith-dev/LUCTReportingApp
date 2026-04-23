@@ -81,15 +81,13 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      // Create Firebase Auth user
       const cred = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
         password,
       );
       const uid = cred.user.uid;
-
-      // Save user to Firestore
+      
       await setDoc(doc(db, "users", uid), {
         name: name.trim(),
         email: email.trim(),
@@ -99,13 +97,11 @@ export default function RegisterScreen() {
         status: "Active",
       });
 
-      // Auto-enroll students in all existing classes AND courses
       if (role === "student") {
         try {
-          // Enroll in all existing classes
+          
           await enrollNewStudentInAllClasses(uid, name.trim(), email.trim());
 
-          // Also add student to all existing courses
           await addStudentToAllCourses(uid, name.trim(), email.trim());
 
           console.log("Student auto-enrolled successfully");
@@ -115,8 +111,7 @@ export default function RegisterScreen() {
       }
 
       const roleLabel = ROLES.find((r) => r.key === role)?.label || role;
-
-      // Success alert with clear next steps
+      
       Alert.alert(
         "Registration Successful! ✅",
         `Welcome ${name.trim()}!\n\nRole: ${roleLabel}\n\nYou can now login with your email and password.`,
@@ -128,7 +123,6 @@ export default function RegisterScreen() {
         ],
       );
 
-      // Reset form
       setName("");
       setEmail("");
       setPassword("");
