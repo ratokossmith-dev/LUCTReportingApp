@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "LUCT Reporting App",
+    "slug": "LUCTReportingApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "luctreportingapp",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0f2c"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
