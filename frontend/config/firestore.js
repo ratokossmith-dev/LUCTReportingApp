@@ -31,6 +31,12 @@ export const addStudentToCourse = (courseId, studentId, name, email) =>
 
 export const deleteCourse = (courseId) => api.deleteCourse(courseId);
 
+export const deleteRating = (ratingId) =>
+  api.request(`/ratings/${ratingId}`, { method: 'DELETE' });
+
+export const removeStudentFromClass = (classId, studentId) =>
+  api.request(`/users/class/${classId}/student/${studentId}`, { method: 'DELETE' });
+
 export const getAllClasses = () => api.getAllClasses();
 
 export const getClassesByLecturer = () => api.getMyClasses();

@@ -17,12 +17,9 @@ router.get('/', protect, authorize('pl'), async (req, res) => {
     const db = req.db;
     const snapshot = await db.collection('users').get();
     const users = [];
-    snapshot.forEach((doc) => {
-      users.push({ id: doc.id, ...doc.data() });
-    });
+    snapshot.forEach((doc) => users.push({ id: doc.id, ...doc.data() }));
     res.json(users);
   } catch (error) {
-    console.error('Get all users error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -32,12 +29,9 @@ router.get('/students', protect, authorize('pl', 'prl', 'lecturer'), async (req,
     const db = req.db;
     const snapshot = await db.collection('users').where('role', '==', 'student').get();
     const students = [];
-    snapshot.forEach((doc) => {
-      students.push({ id: doc.id, ...doc.data() });
-    });
+    snapshot.forEach((doc) => students.push({ id: doc.id, ...doc.data() }));
     res.json(students);
   } catch (error) {
-    console.error('Get students error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -47,12 +41,9 @@ router.get('/lecturers', protect, authorize('pl', 'prl', 'student'), async (req,
     const db = req.db;
     const snapshot = await db.collection('users').where('role', '==', 'lecturer').get();
     const lecturers = [];
-    snapshot.forEach((doc) => {
-      lecturers.push({ id: doc.id, ...doc.data() });
-    });
+    snapshot.forEach((doc) => lecturers.push({ id: doc.id, ...doc.data() }));
     res.json(lecturers);
   } catch (error) {
-    console.error('Get lecturers error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -61,10 +52,8 @@ router.get('/students-not-in-course/:courseId', protect, authorize('pl', 'prl', 
   try {
     const db = req.db;
     const { courseId } = req.params;
-
     const courseDoc = await db.collection('courses').doc(courseId).get();
     const enrolledIds = courseDoc.exists ? courseDoc.data().studentIds || [] : [];
-
     const snapshot = await db.collection('users').where('role', '==', 'student').get();
     const students = [];
     snapshot.forEach((doc) => {
@@ -74,7 +63,6 @@ router.get('/students-not-in-course/:courseId', protect, authorize('pl', 'prl', 
     });
     res.json(students);
   } catch (error) {
-    console.error('Get students not in course error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -83,15 +71,12 @@ router.post('/lecturers', protect, authorize('pl'), async (req, res) => {
   try {
     const { email, password, name, facultyName } = req.body;
     const db = req.db;
-
     const tempPassword = password || generateTempPassword();
-
     const userRecord = await admin.auth().createUser({
       email,
       password: tempPassword,
       displayName: name,
     });
-
     await db.collection('users').doc(userRecord.uid).set({
       id: userRecord.uid,
       name,
@@ -99,19 +84,48 @@ router.post('/lecturers', protect, authorize('pl'), async (req, res) => {
       role: 'lecturer',
       facultyName: facultyName || 'Faculty of ICT',
       status: 'Active',
-      tempPassword: tempPassword,
+      tempPassword,
       createdAt: new Date().toISOString(),
       createdBy: req.user.uid,
     });
-
     res.status(201).json({
       success: true,
       message: 'Lecturer created successfully',
       uid: userRecord.uid,
-      tempPassword: tempPassword,
+      tempPassword,
     });
   } catch (error) {
-    console.error('Create lecturer error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove student from a specific class
+router.delete('/class/:classId/student/:studentId', protect, authorize('lecturer'), async (req, res) => {
+  try {
+    const db = req.db;
+    const { classId, studentId } = req.params;
+
+    // Remove from enrollments
+    const enrollmentsSnapshot = await db.collection('enrollments')
+      .where('classId', '==', classId)
+      .where('studentId', '==', studentId)
+      .get();
+    for (const doc of enrollmentsSnapshot.docs) {
+      await db.collection('enrollments').doc(doc.id).delete();
+    }
+
+    // Remove attendance records for this student in this class
+    const attendanceSnapshot = await db.collection('attendance')
+      .where('classId', '==', classId)
+      .where('studentId', '==', studentId)
+      .get();
+    for (const doc of attendanceSnapshot.docs) {
+      await db.collection('attendance').doc(doc.id).delete();
+    }
+
+    res.json({ success: true, message: 'Student removed from class' });
+  } catch (error) {
+    console.error('Remove student from class error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -132,6 +146,7 @@ router.delete('/:userId', protect, authorize('pl'), async (req, res) => {
     const userRole = userData.role;
 
     if (userRole === 'lecturer') {
+      // Remove from courses
       const coursesSnapshot = await db.collection('courses').get();
       for (const courseDoc of coursesSnapshot.docs) {
         const course = courseDoc.data();
@@ -141,11 +156,31 @@ router.delete('/:userId', protect, authorize('pl'), async (req, res) => {
         }
       }
 
+      // Delete lecturer's classes and related data
+      const classesSnapshot = await db.collection('classes').where('lecturerId', '==', userId).get();
+      for (const classDoc of classesSnapshot.docs) {
+        // Delete enrollments for this class
+        const enrollmentsSnapshot = await db.collection('enrollments')
+          .where('classId', '==', classDoc.id).get();
+        for (const enrollDoc of enrollmentsSnapshot.docs) {
+          await db.collection('enrollments').doc(enrollDoc.id).delete();
+        }
+        // Delete attendance for this class
+        const attendanceSnapshot = await db.collection('attendance')
+          .where('classId', '==', classDoc.id).get();
+        for (const attendDoc of attendanceSnapshot.docs) {
+          await db.collection('attendance').doc(attendDoc.id).delete();
+        }
+        await db.collection('classes').doc(classDoc.id).delete();
+      }
+
+      // Delete reports
       const reportsSnapshot = await db.collection('reports').where('lecturerId', '==', userId).get();
       for (const reportDoc of reportsSnapshot.docs) {
         await db.collection('reports').doc(reportDoc.id).delete();
       }
 
+      // Delete ratings
       const ratingsSnapshot = await db.collection('ratings').where('lecturerId', '==', userId).get();
       for (const ratingDoc of ratingsSnapshot.docs) {
         await db.collection('ratings').doc(ratingDoc.id).delete();
@@ -153,6 +188,7 @@ router.delete('/:userId', protect, authorize('pl'), async (req, res) => {
     }
 
     if (userRole === 'student') {
+      // Remove from courses
       const coursesSnapshot = await db.collection('courses').get();
       for (const courseDoc of coursesSnapshot.docs) {
         const course = courseDoc.data();
@@ -162,16 +198,19 @@ router.delete('/:userId', protect, authorize('pl'), async (req, res) => {
         }
       }
 
+      // Delete enrollments
       const enrollmentsSnapshot = await db.collection('enrollments').where('studentId', '==', userId).get();
       for (const enrollmentDoc of enrollmentsSnapshot.docs) {
         await db.collection('enrollments').doc(enrollmentDoc.id).delete();
       }
 
+      // Delete attendance
       const attendanceSnapshot = await db.collection('attendance').where('studentId', '==', userId).get();
       for (const attendanceDoc of attendanceSnapshot.docs) {
         await db.collection('attendance').doc(attendanceDoc.id).delete();
       }
 
+      // Delete ratings
       const ratingsSnapshot = await db.collection('ratings').where('studentId', '==', userId).get();
       for (const ratingDoc of ratingsSnapshot.docs) {
         await db.collection('ratings').doc(ratingDoc.id).delete();

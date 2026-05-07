@@ -27,6 +27,9 @@ const api = {
     await AsyncStorage.removeItem('authToken');
   },
 
+  deleteRating: (ratingId) => api.request(`/ratings/${ratingId}`, { method: 'DELETE' }),
+removeStudentFromClass: (classId, studentId) => api.request(`/users/class/${classId}/student/${studentId}`, { method: 'DELETE' }),
+
   request: async (endpoint, options = {}) => {
     const token = await api.getToken();
 

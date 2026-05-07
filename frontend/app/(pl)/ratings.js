@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getAllRatings } from '../../config/firestore';
+import { getAllRatings, deleteRating } from '../../config/firestore';
 
 export default function PLRatings() {
   const [ratings, setRatings] = useState([]);
@@ -33,6 +34,30 @@ export default function PLRatings() {
       console.log('Error:', e);
     }
     setLoading(false);
+  };
+
+  const handleDeleteRating = (ratingId, studentName) => {
+    Alert.alert(
+      'Delete Rating',
+      `Are you sure you want to delete the rating from "${studentName}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRating(ratingId);
+              Alert.alert('Success', 'Rating deleted successfully');
+              loadRatings();
+            } catch (e) {
+              console.log('Delete rating error:', e);
+              Alert.alert('Delete Failed', e.message || 'Unknown error');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const filtered = ratings.filter((r) => {
@@ -74,11 +99,21 @@ export default function PLRatings() {
           <Text style={styles.overallLabel}>{filtered.length} reviews</Text>
         </View>
 
-        <TextInput style={styles.searchInput} placeholder="Search ratings..." placeholderTextColor="#555b7a" value={search} onChangeText={setSearch} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search ratings..."
+          placeholderTextColor="#555b7a"
+          value={search}
+          onChangeText={setSearch}
+        />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
           {lecturers.map((l) => (
-            <TouchableOpacity key={l} style={[styles.filterBtn, selected === l && styles.filterBtnActive]} onPress={() => setSelected(l)}>
+            <TouchableOpacity
+              key={l}
+              style={[styles.filterBtn, selected === l && styles.filterBtnActive]}
+              onPress={() => setSelected(l)}
+            >
               <Text style={[styles.filterText, selected === l && styles.filterTextActive]}>{l}</Text>
             </TouchableOpacity>
           ))}
@@ -102,6 +137,12 @@ export default function PLRatings() {
                   <Text style={styles.studentName}>{item.studentName || 'Student'}</Text>
                   <Text style={styles.lecturerName}>{item.lecturerName} - {item.course || 'N/A'}</Text>
                 </View>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDeleteRating(item.id, item.studentName)}
+                >
+                  <Text style={styles.deleteBtnText}>Delete</Text>
+                </TouchableOpacity>
               </View>
               <Stars count={item.rating} />
               {item.comment ? <Text style={styles.ratingComment}>{item.comment}</Text> : null}
@@ -138,5 +179,7 @@ const styles = StyleSheet.create({
   ratingInfo: { flex: 1 },
   studentName: { color: '#fff', fontSize: 14, fontWeight: '600' },
   lecturerName: { color: '#6b7280', fontSize: 12, marginTop: 2 },
+  deleteBtn: { backgroundColor: '#ef4444', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  deleteBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   ratingComment: { color: '#9ca3af', fontSize: 13, marginTop: 8 },
 });

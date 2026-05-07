@@ -17,45 +17,75 @@ import {
   getMyCourses,
   getStudentsNotInCourse,
   lecturerAddStudentToCourse,
+  getClassesByLecturer,
+  removeStudentFromClass,
 } from '../../config/firestore';
+import api from '../../config/api';
 
 export default function ManageStudents() {
   const { profile } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(null);
   const [availableStudents, setAvailableStudents] = useState([]);
+  const [enrolledStudents, setEnrolledStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [search, setSearch] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [removeModalVisible, setRemoveModalVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState('courses');
 
   useEffect(() => {
-    if (profile) loadCourses();
+    if (profile) loadData();
   }, [profile]);
 
-  const loadCourses = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // Use getMyCourses which uses the auth token to get lecturer's courses
-      const coursesData = await getMyCourses();
+      const [coursesData, classesData] = await Promise.all([
+        getMyCourses(),
+        getClassesByLecturer(),
+      ]);
       setCourses(coursesData);
+      setClasses(classesData);
     } catch (e) {
-      console.log('Load courses error:', e);
-      Alert.alert('Error', 'Failed to load courses');
+      console.log('Load error:', e);
+      Alert.alert('Error', 'Failed to load data');
     }
     setLoading(false);
   };
 
-  const selectCourse = async (course) => {
+  const openAddModal = async (course) => {
     setSelectedCourse(course);
-    setModalVisible(true);
+    setAddModalVisible(true);
     setLoading(true);
     try {
       const studentsNotEnrolled = await getStudentsNotInCourse(course.id);
       setAvailableStudents(studentsNotEnrolled);
     } catch (e) {
       console.log('Load students error:', e);
-      Alert.alert('Error', 'Failed to load students');
+    }
+    setLoading(false);
+  };
+
+  const openRemoveModal = async (cls) => {
+    setSelectedClass(cls);
+    setRemoveModalVisible(true);
+    setLoading(true);
+    try {
+      const enrollments = await api.request(`/attendance/class/${cls.id}`);
+      const students = enrollments.map((e) => ({
+        id: e.studentId,
+        name: e.studentName || 'Unknown',
+        email: e.studentEmail || '',
+      })).filter((s) => s.id);
+      setEnrolledStudents(students);
+    } catch (e) {
+      console.log('Load enrolled students error:', e);
+      setEnrolledStudents([]);
     }
     setLoading(false);
   };
@@ -64,21 +94,53 @@ export default function ManageStudents() {
     setAdding(true);
     try {
       await lecturerAddStudentToCourse(selectedCourse.id, student.id);
-      Alert.alert('Success', `${student.name} has been added to ${selectedCourse.courseName}`);
+      Alert.alert('Success', `${student.name} added to ${selectedCourse.courseName}`);
       const updatedStudents = await getStudentsNotInCourse(selectedCourse.id);
       setAvailableStudents(updatedStudents);
+      loadData();
     } catch (e) {
-      console.log('Add student error:', e);
       Alert.alert('Error', e.message || 'Failed to add student');
     }
     setAdding(false);
   };
 
-  const filteredStudents = availableStudents.filter(
-    (s) =>
-      !search ||
-      (s.name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (s.email || '').toLowerCase().includes(search.toLowerCase())
+  const handleRemoveStudent = (student) => {
+    Alert.alert(
+      'Remove Student',
+      `Remove "${student.name}" from ${selectedClass.className}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemoving(true);
+            try {
+              await removeStudentFromClass(selectedClass.id, student.id);
+              Alert.alert('Success', `${student.name} removed from class`);
+              const updatedEnrollments = await api.request(`/attendance/class/${selectedClass.id}`);
+              const updatedStudents = updatedEnrollments.map((e) => ({
+                id: e.studentId,
+                name: e.studentName || 'Unknown',
+                email: e.studentEmail || '',
+              })).filter((s) => s.id);
+              setEnrolledStudents(updatedStudents);
+            } catch (e) {
+              Alert.alert('Error', e.message || 'Failed to remove student');
+            }
+            setRemoving(false);
+          },
+        },
+      ]
+    );
+  };
+
+  const filteredAvailable = availableStudents.filter(
+    (s) => !search || (s.name || '').toLowerCase().includes(search.toLowerCase()) || (s.email || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredEnrolled = enrolledStudents.filter(
+    (s) => !search || (s.name || '').toLowerCase().includes(search.toLowerCase()) || (s.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -92,59 +154,81 @@ export default function ManageStudents() {
           <View style={{ width: 50 }} />
         </View>
 
-        <Text style={s.subtitle}>Select a course to manage student enrollment</Text>
+        <View style={s.tabRow}>
+          <TouchableOpacity
+            style={[s.tab, activeTab === 'courses' && s.tabActive]}
+            onPress={() => setActiveTab('courses')}
+          >
+            <Text style={[s.tabText, activeTab === 'courses' && s.tabTextActive]}>Add to Course</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.tab, activeTab === 'classes' && s.tabActive]}
+            onPress={() => setActiveTab('classes')}
+          >
+            <Text style={[s.tabText, activeTab === 'classes' && s.tabTextActive]}>Remove from Class</Text>
+          </TouchableOpacity>
+        </View>
 
         {loading && courses.length === 0 ? (
-          <ActivityIndicator color="#4f46e5" />
-        ) : courses.length === 0 ? (
-          <View style={s.emptyCard}>
-            <Text style={s.emptyText}>No courses assigned to you yet</Text>
-            <Text style={s.emptySubtext}>Program Leader needs to assign courses to you first</Text>
-          </View>
+          <ActivityIndicator color="#4f46e5" style={{ marginTop: 40 }} />
+        ) : activeTab === 'courses' ? (
+          <>
+            <Text style={s.subtitle}>Select a course to add students</Text>
+            {courses.length === 0 ? (
+              <View style={s.emptyCard}>
+                <Text style={s.emptyText}>No courses assigned to you yet</Text>
+                <Text style={s.emptySubtext}>Program Leader needs to assign courses first</Text>
+              </View>
+            ) : (
+              courses.map((course) => (
+                <TouchableOpacity key={course.id} style={s.courseCard} onPress={() => openAddModal(course)}>
+                  <Text style={s.courseCode}>{course.courseCode}</Text>
+                  <Text style={s.courseName}>{course.courseName}</Text>
+                  <Text style={s.courseStats}>Students enrolled: {course.studentIds?.length || 0}</Text>
+                  <View style={s.addBadge}>
+                    <Text style={s.addBadgeText}>+ Add Students</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </>
         ) : (
-          courses.map((course) => (
-            <TouchableOpacity key={course.id} style={s.courseCard} onPress={() => selectCourse(course)}>
-              <Text style={s.courseCode}>{course.courseCode}</Text>
-              <Text style={s.courseName}>{course.courseName}</Text>
-              <Text style={s.courseStats}>
-                Students enrolled: {course.studentIds?.length || 0}
-              </Text>
-            </TouchableOpacity>
-          ))
+          <>
+            <Text style={s.subtitle}>Select a class to remove students</Text>
+            {classes.length === 0 ? (
+              <View style={s.emptyCard}>
+                <Text style={s.emptyText}>No classes found</Text>
+              </View>
+            ) : (
+              classes.map((cls) => (
+                <TouchableOpacity key={cls.id} style={s.courseCard} onPress={() => openRemoveModal(cls)}>
+                  <Text style={s.courseCode}>{cls.courseCode}</Text>
+                  <Text style={s.courseName}>{cls.className}</Text>
+                  <Text style={s.courseStats}>Day: {cls.day} | Time: {cls.scheduledTime}</Text>
+                  <View style={[s.addBadge, { backgroundColor: '#ef444420', borderColor: '#ef4444' }]}>
+                    <Text style={[s.addBadgeText, { color: '#ef4444' }]}>Remove Students</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </>
         )}
       </ScrollView>
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* Add Students Modal */}
+      <Modal visible={addModalVisible} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
             <View style={s.modalHeader}>
               <View>
                 <Text style={s.modalTitle}>Add Students</Text>
-                <Text style={s.modalSubtitle}>
-                  {selectedCourse?.courseCode} - {selectedCourse?.courseName}
-                </Text>
+                <Text style={s.modalSubtitle}>{selectedCourse?.courseCode} - {selectedCourse?.courseName}</Text>
               </View>
-              <TouchableOpacity
-                style={s.closeBtn}
-                onPress={() => {
-                  setModalVisible(false);
-                  setSelectedCourse(null);
-                  setSearch('');
-                  setAvailableStudents([]);
-                }}
-              >
+              <TouchableOpacity style={s.closeBtn} onPress={() => { setAddModalVisible(false); setSearch(''); setAvailableStudents([]); }}>
                 <Text style={s.closeBtnText}>X</Text>
               </TouchableOpacity>
             </View>
-
-            <TextInput
-              style={s.searchInput}
-              placeholder="Search students..."
-              placeholderTextColor="#555b7a"
-              value={search}
-              onChangeText={setSearch}
-            />
-
+            <TextInput style={s.searchInput} placeholder="Search students..." placeholderTextColor="#555b7a" value={search} onChangeText={setSearch} />
             <ScrollView style={s.studentList}>
               {loading ? (
                 <ActivityIndicator color="#4f46e5" style={{ marginTop: 20 }} />
@@ -153,7 +237,7 @@ export default function ManageStudents() {
                   <Text style={s.emptyText}>All students are already enrolled</Text>
                 </View>
               ) : (
-                filteredStudents.map((student) => (
+                filteredAvailable.map((student) => (
                   <View key={student.id} style={s.studentCard}>
                     <View style={s.studentInfo}>
                       <View style={s.avatar}>
@@ -164,12 +248,52 @@ export default function ManageStudents() {
                         <Text style={s.studentEmail}>{student.email}</Text>
                       </View>
                     </View>
-                    <TouchableOpacity
-                      style={[s.addBtn, adding && s.addBtnDisabled]}
-                      onPress={() => addStudentToCourse(student)}
-                      disabled={adding}
-                    >
-                      <Text style={s.addBtnText}>+ Add</Text>
+                    <TouchableOpacity style={[s.actionBtn, adding && s.actionBtnDisabled]} onPress={() => addStudentToCourse(student)} disabled={adding}>
+                      <Text style={s.actionBtnText}>+ Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Remove Students Modal */}
+      <Modal visible={removeModalVisible} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <View>
+                <Text style={s.modalTitle}>Remove Students</Text>
+                <Text style={s.modalSubtitle}>{selectedClass?.className}</Text>
+              </View>
+              <TouchableOpacity style={s.closeBtn} onPress={() => { setRemoveModalVisible(false); setSearch(''); setEnrolledStudents([]); }}>
+                <Text style={s.closeBtnText}>X</Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput style={s.searchInput} placeholder="Search students..." placeholderTextColor="#555b7a" value={search} onChangeText={setSearch} />
+            <ScrollView style={s.studentList}>
+              {loading ? (
+                <ActivityIndicator color="#4f46e5" style={{ marginTop: 20 }} />
+              ) : enrolledStudents.length === 0 ? (
+                <View style={s.emptyCard}>
+                  <Text style={s.emptyText}>No students enrolled in this class</Text>
+                </View>
+              ) : (
+                filteredEnrolled.map((student) => (
+                  <View key={student.id} style={s.studentCard}>
+                    <View style={s.studentInfo}>
+                      <View style={[s.avatar, { backgroundColor: '#ef4444' }]}>
+                        <Text style={s.avatarText}>{student.name?.charAt(0) || 'S'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.studentName}>{student.name}</Text>
+                        <Text style={s.studentEmail}>{student.email}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={[s.removeBtn, removing && s.actionBtnDisabled]} onPress={() => handleRemoveStudent(student)} disabled={removing}>
+                      <Text style={s.removeBtnText}>Remove</Text>
                     </TouchableOpacity>
                   </View>
                 ))
@@ -188,11 +312,18 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, marginTop: 16 },
   back: { color: '#4f46e5', fontSize: 18, fontWeight: '600', width: 50 },
   title: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  subtitle: { color: '#6b7280', fontSize: 14, marginBottom: 20 },
+  tabRow: { flexDirection: 'row', marginBottom: 20, backgroundColor: '#1a1f3c', borderRadius: 12, padding: 4 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+  tabActive: { backgroundColor: '#4f46e5' },
+  tabText: { color: '#6b7280', fontSize: 13, fontWeight: '600' },
+  tabTextActive: { color: '#fff' },
+  subtitle: { color: '#6b7280', fontSize: 14, marginBottom: 16 },
   courseCard: { backgroundColor: '#1a1f3c', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 0.5, borderColor: '#2a2f5c' },
   courseCode: { color: '#4f46e5', fontSize: 12, fontWeight: '600' },
   courseName: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 4 },
-  courseStats: { color: '#6b7280', fontSize: 12, marginTop: 8 },
+  courseStats: { color: '#6b7280', fontSize: 12, marginTop: 6 },
+  addBadge: { marginTop: 10, backgroundColor: '#10b98120', borderRadius: 8, padding: 6, alignItems: 'center', borderWidth: 0.5, borderColor: '#10b981' },
+  addBadgeText: { color: '#10b981', fontSize: 12, fontWeight: '600' },
   emptyCard: { backgroundColor: '#1a1f3c', borderRadius: 14, padding: 24, alignItems: 'center', borderWidth: 0.5, borderColor: '#2a2f5c' },
   emptyText: { color: '#6b7280', fontSize: 14 },
   emptySubtext: { color: '#4f46e5', fontSize: 12, marginTop: 8, textAlign: 'center' },
@@ -211,7 +342,9 @@ const s = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   studentName: { color: '#fff', fontSize: 14, fontWeight: '600' },
   studentEmail: { color: '#6b7280', fontSize: 12, marginTop: 2 },
-  addBtn: { backgroundColor: '#10b981', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  addBtnDisabled: { backgroundColor: '#6b7280' },
-  addBtnText: { color: '#fff', fontWeight: '600' },
+  actionBtn: { backgroundColor: '#10b981', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  actionBtnDisabled: { backgroundColor: '#6b7280' },
+  actionBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  removeBtn: { backgroundColor: '#ef4444', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  removeBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
 });
