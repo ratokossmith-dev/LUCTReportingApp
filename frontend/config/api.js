@@ -1,20 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-import { auth } from './auth';
+import { auth } from './firebase';
 
-const getBaseUrl = () => {
-  if (Platform.OS === 'android') {
-    return 'http://10.11.6.37:5000/api';
-  } else if (Platform.OS === 'ios') {
-    return 'http://10.11.6.37:5000/api';
-  } else {
-    return 'http://localhost:5000/api';
-  }
-};
-
-const API_URL = getBaseUrl();
-
-console.log('API URL:', API_URL);
+const API_URL = 'https://luct-reporting-backend-2uum.onrender.com/api';
 
 const api = {
   getToken: async () => {
@@ -144,6 +131,7 @@ const api = {
 
   getAllStudents: () => api.request('/users/students'),
   getAllLecturers: () => api.request('/users/lecturers'),
+  getStudentsNotInCourse: (courseId) => api.request(`/users/students-not-in-course/${courseId}`),
   createLecturer: (lecturerData) => api.request('/users/lecturers', {
     method: 'POST',
     body: JSON.stringify(lecturerData),
