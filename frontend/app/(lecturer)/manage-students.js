@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../config/AuthContext';
 import {
-  getAvailableCoursesForLecturer,
+  getMyCourses,
   getStudentsNotInCourse,
   lecturerAddStudentToCourse,
 } from '../../config/firestore';
@@ -22,7 +23,6 @@ export default function ManageStudents() {
   const { profile } = useAuth();
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [students, setStudents] = useState([]);
   const [availableStudents, setAvailableStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -30,13 +30,14 @@ export default function ManageStudents() {
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    loadCourses();
+    if (profile) loadCourses();
   }, [profile]);
 
   const loadCourses = async () => {
     setLoading(true);
     try {
-      const coursesData = await getAvailableCoursesForLecturer(profile.id);
+      // Use getMyCourses which uses the auth token to get lecturer's courses
+      const coursesData = await getMyCourses();
       setCourses(coursesData);
     } catch (e) {
       console.log('Load courses error:', e);
@@ -54,6 +55,7 @@ export default function ManageStudents() {
       setAvailableStudents(studentsNotEnrolled);
     } catch (e) {
       console.log('Load students error:', e);
+      Alert.alert('Error', 'Failed to load students');
     }
     setLoading(false);
   };
@@ -63,7 +65,6 @@ export default function ManageStudents() {
     try {
       await lecturerAddStudentToCourse(selectedCourse.id, student.id);
       Alert.alert('Success', `${student.name} has been added to ${selectedCourse.courseName}`);
-
       const updatedStudents = await getStudentsNotInCourse(selectedCourse.id);
       setAvailableStudents(updatedStudents);
     } catch (e) {
@@ -76,12 +77,12 @@ export default function ManageStudents() {
   const filteredStudents = availableStudents.filter(
     (s) =>
       !search ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase())
+      (s.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (s.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <View style={s.safe}>
+    <SafeAreaView style={s.safe}>
       <ScrollView style={s.container}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -93,18 +94,21 @@ export default function ManageStudents() {
 
         <Text style={s.subtitle}>Select a course to manage student enrollment</Text>
 
-        {loading && !selectedCourse ? (
+        {loading && courses.length === 0 ? (
           <ActivityIndicator color="#4f46e5" />
         ) : courses.length === 0 ? (
           <View style={s.emptyCard}>
             <Text style={s.emptyText}>No courses assigned to you yet</Text>
+            <Text style={s.emptySubtext}>Program Leader needs to assign courses to you first</Text>
           </View>
         ) : (
           courses.map((course) => (
             <TouchableOpacity key={course.id} style={s.courseCard} onPress={() => selectCourse(course)}>
               <Text style={s.courseCode}>{course.courseCode}</Text>
               <Text style={s.courseName}>{course.courseName}</Text>
-              <Text style={s.courseStats}>Students: {course.studentIds?.length || 0} enrolled</Text>
+              <Text style={s.courseStats}>
+                Students enrolled: {course.studentIds?.length || 0}
+              </Text>
             </TouchableOpacity>
           ))
         )}
@@ -114,9 +118,21 @@ export default function ManageStudents() {
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
             <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Add Students</Text>
-              <Text style={s.modalSubtitle}>{selectedCourse?.courseCode} - {selectedCourse?.courseName}</Text>
-              <TouchableOpacity style={s.closeBtn} onPress={() => { setModalVisible(false); setSelectedCourse(null); setSearch(''); }}>
+              <View>
+                <Text style={s.modalTitle}>Add Students</Text>
+                <Text style={s.modalSubtitle}>
+                  {selectedCourse?.courseCode} - {selectedCourse?.courseName}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={s.closeBtn}
+                onPress={() => {
+                  setModalVisible(false);
+                  setSelectedCourse(null);
+                  setSearch('');
+                  setAvailableStudents([]);
+                }}
+              >
                 <Text style={s.closeBtnText}>X</Text>
               </TouchableOpacity>
             </View>
@@ -131,7 +147,7 @@ export default function ManageStudents() {
 
             <ScrollView style={s.studentList}>
               {loading ? (
-                <ActivityIndicator color="#4f46e5" />
+                <ActivityIndicator color="#4f46e5" style={{ marginTop: 20 }} />
               ) : availableStudents.length === 0 ? (
                 <View style={s.emptyCard}>
                   <Text style={s.emptyText}>All students are already enrolled</Text>
@@ -143,12 +159,16 @@ export default function ManageStudents() {
                       <View style={s.avatar}>
                         <Text style={s.avatarText}>{student.name?.charAt(0) || 'S'}</Text>
                       </View>
-                      <View>
+                      <View style={{ flex: 1 }}>
                         <Text style={s.studentName}>{student.name}</Text>
                         <Text style={s.studentEmail}>{student.email}</Text>
                       </View>
                     </View>
-                    <TouchableOpacity style={[s.addBtn, adding && s.addBtnDisabled]} onPress={() => addStudentToCourse(student)} disabled={adding}>
+                    <TouchableOpacity
+                      style={[s.addBtn, adding && s.addBtnDisabled]}
+                      onPress={() => addStudentToCourse(student)}
+                      disabled={adding}
+                    >
                       <Text style={s.addBtnText}>+ Add</Text>
                     </TouchableOpacity>
                   </View>
@@ -158,7 +178,7 @@ export default function ManageStudents() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -173,14 +193,15 @@ const s = StyleSheet.create({
   courseCode: { color: '#4f46e5', fontSize: 12, fontWeight: '600' },
   courseName: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 4 },
   courseStats: { color: '#6b7280', fontSize: 12, marginTop: 8 },
-  emptyCard: { backgroundColor: '#1a1f3c', borderRadius: 14, padding: 24, alignItems: 'center' },
+  emptyCard: { backgroundColor: '#1a1f3c', borderRadius: 14, padding: 24, alignItems: 'center', borderWidth: 0.5, borderColor: '#2a2f5c' },
   emptyText: { color: '#6b7280', fontSize: 14 },
+  emptySubtext: { color: '#4f46e5', fontSize: 12, marginTop: 8, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#1a1f3c', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '90%' },
-  modalHeader: { marginBottom: 16 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   modalTitle: { color: '#fff', fontSize: 20, fontWeight: '700' },
   modalSubtitle: { color: '#6b7280', fontSize: 13, marginTop: 4 },
-  closeBtn: { position: 'absolute', top: 0, right: 0, padding: 8 },
+  closeBtn: { padding: 8 },
   closeBtnText: { color: '#6b7280', fontSize: 20 },
   searchInput: { backgroundColor: '#0a0f2c', borderRadius: 12, padding: 12, color: '#fff', marginBottom: 16, borderWidth: 0.5, borderColor: '#2a2f5c' },
   studentList: { maxHeight: 500 },

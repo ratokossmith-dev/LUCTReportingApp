@@ -1,4 +1,4 @@
-import api from './auth';
+import api from './api';
 
 export const getAllCourses = () => api.getAllCourses();
 
@@ -10,6 +10,9 @@ export const getAvailableCoursesForLecturer = async (lecturerId) => {
   const myCourseIds = myCourses.map(c => c.id);
   return allCourses.filter(c => !myCourseIds.includes(c.id));
 };
+
+export const getMyCourses = () =>
+  api.request('/courses/my-courses');
 
 export const getStudentCourses = () => api.getMyCourses();
 

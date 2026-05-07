@@ -12,12 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../config/AuthContext';
-import {
-  addClass,
-  deleteClass,
-  getAvailableCoursesForLecturer,
-  getClassesByLecturer,
-} from '../../config/firestore';
+import { addClass, deleteClass, getMyCourses, getClassesByLecturer } from '../../config/firestore';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -54,7 +49,7 @@ export default function LecturerClasses() {
     try {
       const [c, co] = await Promise.all([
         getClassesByLecturer(),
-        getAvailableCoursesForLecturer(profile.id),
+        getMyCourses(),
       ]);
 
       setClasses(c || []);
