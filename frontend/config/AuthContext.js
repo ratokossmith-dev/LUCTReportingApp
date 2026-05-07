@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './auth';
+import { auth } from './firebase';
 import api from './api';
 
 const AuthContext = createContext(null);
@@ -10,57 +10,63 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
 
   useEffect(() => {
+    isMounted.current = true;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
+      try {
+        if (firebaseUser && isMounted.current) {
           const idToken = await firebaseUser.getIdToken(false);
           await api.setToken(idToken);
-
           setUser(firebaseUser);
 
           const response = await api.getMe();
 
-          if (response?.user) {
-            const userProfile = {
-              id: firebaseUser.uid,
-              ...response.user,
-            };
+          if (response?.user && isMounted.current) {
+            const userProfile = { id: firebaseUser.uid, ...response.user };
             setProfile(userProfile);
+            setLoading(false);
 
             const role = userProfile.role;
-            if (role === 'student') router.replace('/(student)');
-            else if (role === 'lecturer') router.replace('/(lecturer)');
-            else if (role === 'prl') router.replace('/(prl)');
-            else if (role === 'pl') router.replace('/(pl)');
-            else {
-              console.log('Unknown role:', role);
-              router.replace('/(auth)/login');
-            }
-          } else {
+            setTimeout(() => {
+              if (role === 'student') router.replace('/(student)');
+              else if (role === 'lecturer') router.replace('/(lecturer)');
+              else if (role === 'prl') router.replace('/(prl)');
+              else if (role === 'pl') router.replace('/(pl)');
+              else router.replace('/(auth)/login');
+            }, 150);
+          } else if (isMounted.current) {
             await api.removeToken();
             setUser(null);
             setProfile(null);
-            router.replace('/(auth)/login');
+            setLoading(false);
+            setTimeout(() => router.replace('/(auth)/login'), 150);
           }
-        } catch (e) {
-          console.log('Auth profile error:', e);
+        } else if (isMounted.current) {
           await api.removeToken();
           setUser(null);
           setProfile(null);
-          router.replace('/(auth)/login');
+          setLoading(false);
+          setTimeout(() => router.replace('/(auth)/login'), 150);
         }
-      } else {
-        await api.removeToken();
-        setUser(null);
-        setProfile(null);
-        router.replace('/(auth)/login');
+      } catch (e) {
+        console.log('Auth error:', e);
+        if (isMounted.current) {
+          await api.removeToken();
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          setTimeout(() => router.replace('/(auth)/login'), 150);
+        }
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted.current = false;
+      unsubscribe();
+    };
   }, []);
 
   const refreshToken = async () => {
@@ -72,6 +78,13 @@ export function AuthProvider({ children }) {
     return null;
   };
 
+  const logout = async () => {
+    await api.removeToken();
+    setUser(null);
+    setProfile(null);
+    setTimeout(() => router.replace('/(auth)/login'), 150);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -79,6 +92,7 @@ export function AuthProvider({ children }) {
         profile,
         loading,
         refreshToken,
+        logout,
         isAuthenticated: !!user,
         userRole: profile?.role,
       }}

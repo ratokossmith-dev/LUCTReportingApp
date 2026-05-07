@@ -1,6 +1,6 @@
-import { router } from "expo-router";
-import { signOut } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -8,15 +8,15 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import { auth } from "../../config/auth";
-import { useAuth } from "../../config/AuthContext";
+} from 'react-native';
+import { auth } from '../../config/firebase';
+import { useAuth } from '../../config/AuthContext';
 import {
   getClassesByLecturer,
   getCoursesByLecturer,
   getRatingsByLecturer,
   getReportsByLecturer,
-} from "../../config/firestore";
+} from '../../config/firestore';
 
 export default function LecturerDashboard() {
   const { profile } = useAuth();
@@ -24,29 +24,25 @@ export default function LecturerDashboard() {
     reports: 0,
     classes: 0,
     courses: 0,
-    rating: "N/A",
+    rating: 'N/A',
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Role guard — only run for lecturers
     if (!profile?.id) return;
-    if (profile.role !== "lecturer") return;
+    if (profile.role !== 'lecturer') return;
 
     (async () => {
       try {
         const [reports, classes, ratings, courses] = await Promise.all([
-          getReportsByLecturer(profile.id),
-          getClassesByLecturer(profile.id),
-          getRatingsByLecturer(profile.id),
-          getCoursesByLecturer(profile.id),
+          getReportsByLecturer(),
+          getClassesByLecturer(),
+          getRatingsByLecturer(),
+          getCoursesByLecturer(),
         ]);
-        const avg =
-          ratings.length > 0
-            ? (
-                ratings.reduce((a, b) => a + b.rating, 0) / ratings.length
-              ).toFixed(1)
-            : "N/A";
+        const avg = ratings.length > 0
+          ? (ratings.reduce((a, b) => a + b.rating, 0) / ratings.length).toFixed(1)
+          : 'N/A';
         setStats({
           reports: reports.length,
           classes: classes.length,
@@ -54,62 +50,61 @@ export default function LecturerDashboard() {
           rating: avg,
         });
       } catch (e) {
-        console.log("Lecturer dashboard error:", e);
+        console.log('Lecturer dashboard error:', e);
       }
       setLoading(false);
     })();
   }, [profile]);
 
-  // Role guard — redirect away if wrong role
-  if (profile && profile.role !== "lecturer") {
+  if (profile && profile.role !== 'lecturer') {
     return null;
   }
 
   const initials = profile?.name
     ? profile.name
-        .split(" ")
+        .split(' ')
         .map((n) => n[0])
-        .join("")
+        .join('')
         .toUpperCase()
         .slice(0, 2)
-    : "LR";
+    : 'LR';
 
   const menu = [
     {
-      icon: "🏫",
-      title: "My Classes",
-      sub: "View & add classes under your courses",
-      route: "/(lecturer)/classes",
+      icon: 'C',
+      title: 'My Classes',
+      sub: 'View and add classes under your courses',
+      route: '/(lecturer)/classes',
     },
     {
-      icon: "👥",
-      title: "Mark Attendance",
-      sub: "Mark attendance for enrolled students",
-      route: "/(lecturer)/attendance",
+      icon: 'A',
+      title: 'Mark Attendance',
+      sub: 'Mark attendance for enrolled students',
+      route: '/(lecturer)/attendance',
     },
     {
-      icon: "📋",
-      title: "Submit Report",
-      sub: "Submit weekly lecture report",
-      route: "/(lecturer)/report",
+      icon: 'R',
+      title: 'Submit Report',
+      sub: 'Submit weekly lecture report',
+      route: '/(lecturer)/report',
     },
     {
-      icon: "📊",
-      title: "Monitoring",
-      sub: "View reports & PRL feedback",
-      route: "/(lecturer)/monitoring",
+      icon: 'M',
+      title: 'Monitoring',
+      sub: 'View reports and PRL feedback',
+      route: '/(lecturer)/monitoring',
     },
     {
-      icon: "⭐",
-      title: "My Ratings",
-      sub: "See student feedback & ratings",
-      route: "/(lecturer)/ratings",
+      icon: 'S',
+      title: 'My Ratings',
+      sub: 'See student feedback and ratings',
+      route: '/(lecturer)/ratings',
     },
     {
-      icon: "👥",
-      title: "Manage Students",
-      sub: "Add students to your courses",
-      route: "/(lecturer)/manage-students",
+      icon: 'P',
+      title: 'Manage Students',
+      sub: 'Add students to your courses',
+      route: '/(lecturer)/manage-students',
     },
   ];
 
@@ -118,10 +113,10 @@ export default function LecturerDashboard() {
       <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
         <View style={s.header}>
           <View>
-            <Text style={s.greeting}>Welcome back 👋</Text>
-            <Text style={s.name}>{profile?.name || "Lecturer"}</Text>
+            <Text style={s.greeting}>Welcome back</Text>
+            <Text style={s.name}>{profile?.name || 'Lecturer'}</Text>
             <Text style={s.role}>
-              Lecturer • {profile?.facultyName || "Faculty of ICT"}
+              Lecturer - {profile?.facultyName || 'Faculty of ICT'}
             </Text>
           </View>
           <View style={s.avatar}>
@@ -135,25 +130,25 @@ export default function LecturerDashboard() {
         ) : (
           <View style={s.grid}>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#10b981" }]}>
+              <Text style={[s.statVal, { color: '#10b981' }]}>
                 {stats.courses}
               </Text>
               <Text style={s.statLabel}>My Courses</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#4f46e5" }]}>
+              <Text style={[s.statVal, { color: '#4f46e5' }]}>
                 {stats.classes}
               </Text>
               <Text style={s.statLabel}>My Classes</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#f59e0b" }]}>
+              <Text style={[s.statVal, { color: '#f59e0b' }]}>
                 {stats.reports}
               </Text>
               <Text style={s.statLabel}>Reports Submitted</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#ec4899" }]}>
+              <Text style={[s.statVal, { color: '#ec4899' }]}>
                 {stats.rating}
               </Text>
               <Text style={s.statLabel}>Avg Rating</Text>
@@ -176,7 +171,7 @@ export default function LecturerDashboard() {
                 <Text style={s.menuTitle}>{item.title}</Text>
                 <Text style={s.menuSub}>{item.sub}</Text>
               </View>
-              <Text style={s.arrow}>›</Text>
+              <Text style={s.arrow}>{'>'}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -185,7 +180,7 @@ export default function LecturerDashboard() {
           style={s.logout}
           onPress={async () => {
             await signOut(auth);
-            router.replace("/(auth)/login");
+            router.replace('/(auth)/login');
           }}
         >
           <Text style={s.logoutText}>Logout</Text>
@@ -196,73 +191,73 @@ export default function LecturerDashboard() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0a0f2c" },
+  safe: { flex: 1, backgroundColor: '#0a0f2c' },
   container: { flex: 1, padding: 24 },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
     marginTop: 16,
   },
-  greeting: { color: "#6b7280", fontSize: 14, marginBottom: 4 },
-  name: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 2 },
-  role: { color: "#4f46e5", fontSize: 12 },
+  greeting: { color: '#6b7280', fontSize: 14, marginBottom: 4 },
+  name: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 2 },
+  role: { color: '#4f46e5', fontSize: 12 },
   avatar: {
     width: 50,
     height: 50,
-    backgroundColor: "#4f46e5",
+    backgroundColor: '#4f46e5',
     borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 14 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
+  avatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  section: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 14 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
   statCard: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 16,
-    width: "47%",
+    width: '47%',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
-  statVal: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
-  statLabel: { color: "#6b7280", fontSize: 11 },
+  statVal: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  statLabel: { color: '#6b7280', fontSize: 11 },
   menuList: { gap: 10, marginBottom: 28 },
   menuItem: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
   menuIcon: {
     width: 42,
     height: 42,
-    backgroundColor: "#0a0f2c",
+    backgroundColor: '#0a0f2c',
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 14,
   },
   menuTitle: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 2,
   },
-  menuSub: { color: "#6b7280", fontSize: 11 },
-  arrow: { color: "#4f46e5", fontSize: 24, fontWeight: "300" },
+  menuSub: { color: '#6b7280', fontSize: 11 },
+  arrow: { color: '#4f46e5', fontSize: 24, fontWeight: '300' },
   logout: {
     borderWidth: 0.5,
-    borderColor: "#ef4444",
+    borderColor: '#ef4444',
     borderRadius: 14,
     padding: 15,
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 32,
   },
-  logoutText: { color: "#ef4444", fontSize: 15, fontWeight: "600" },
+  logoutText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
 });

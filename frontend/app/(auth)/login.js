@@ -1,6 +1,6 @@
-import { router } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { useCallback, useState } from "react";
+import { router } from 'expo-router';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,21 +12,21 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import { auth } from "../../config/auth";
+} from 'react-native';
+import { auth } from '../../config/firebase';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const validateForm = () => {
-    if (!email.trim() || !email.includes("@")) {
-      Alert.alert("Validation Error", "Please enter a valid email address");
+    if (!email.trim() || !email.includes('@')) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
       return false;
     }
     if (password.length < 6) {
-      Alert.alert("Validation Error", "Password must be at least 6 characters");
+      Alert.alert('Validation Error', 'Password must be at least 6 characters');
       return false;
     }
     return true;
@@ -36,25 +36,21 @@ export default function LoginScreen() {
     if (!validateForm()) return;
     setLoading(true);
     try {
-      // Just sign in — AuthContext onAuthStateChanged handles
-      // token saving and routing automatically
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (error) {
-      let message = "Login failed. Please check your credentials.";
+      let message = 'Login failed. Please check your credentials.';
       if (
-        error.code === "auth/invalid-credential" ||
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/user-not-found"
+        error.code === 'auth/invalid-credential' ||
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/user-not-found'
       ) {
-        message = "Invalid email or password. Please try again.";
-      } else if (error.code === "auth/too-many-requests") {
-        message = "Too many failed attempts. Please try again later.";
-      } else if (error.code === "auth/network-request-failed") {
-        message = "No internet connection. Please check your network.";
+        message = 'Invalid email or password. Please try again.';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Too many failed attempts. Please try again later.';
+      } else if (error.code === 'auth/network-request-failed') {
+        message = 'No internet connection. Please check your network.';
       }
-      Alert.alert("Login Failed", message);
-      // Only reset loading on error
-      // On success AuthContext takes over and navigates away
+      Alert.alert('Login Failed', message);
       setLoading(false);
     }
   }, [email, password]);
@@ -62,7 +58,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={s.container}
@@ -109,9 +105,9 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+        <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
           <Text style={s.registerText}>
-            Don't have an account?{" "}
+            Don't have an account?{' '}
             <Text style={s.registerBold}>Register</Text>
           </Text>
         </TouchableOpacity>
@@ -123,56 +119,56 @@ export default function LoginScreen() {
 const s = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: "#0a0f2c",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: '#0a0f2c',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 24,
   },
   logoBox: {
     width: 60,
     height: 60,
-    backgroundColor: "#4f46e5",
+    backgroundColor: '#4f46e5',
     borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
-  logoText: { color: "#fff", fontSize: 28, fontWeight: "700" },
-  title: { fontSize: 28, fontWeight: "700", color: "#fff", marginBottom: 4 },
+  logoText: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  title: { fontSize: 28, fontWeight: '700', color: '#fff', marginBottom: 4 },
   subtitle: {
     fontSize: 13,
-    color: "#6b7280",
+    color: '#6b7280',
     marginBottom: 32,
-    textAlign: "center",
+    textAlign: 'center',
   },
   label: {
-    color: "#9ca3af",
+    color: '#9ca3af',
     fontSize: 13,
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
     marginBottom: 6,
   },
   input: {
-    width: "100%",
-    backgroundColor: "#1a1f3c",
+    width: '100%',
+    backgroundColor: '#1a1f3c',
     borderRadius: 12,
     padding: 15,
-    color: "#fff",
+    color: '#fff',
     marginBottom: 16,
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
     fontSize: 15,
   },
   button: {
-    width: "100%",
-    backgroundColor: "#4f46e5",
+    width: '100%',
+    backgroundColor: '#4f46e5',
     borderRadius: 12,
     padding: 15,
-    alignItems: "center",
+    alignItems: 'center',
     marginTop: 8,
     marginBottom: 16,
   },
-  buttonDisabled: { backgroundColor: "#3730a3" },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  registerText: { color: "#6b7280", fontSize: 14, textAlign: "center" },
-  registerBold: { color: "#4f46e5", fontWeight: "600" },
+  buttonDisabled: { backgroundColor: '#3730a3' },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  registerText: { color: '#6b7280', fontSize: 14, textAlign: 'center' },
+  registerBold: { color: '#4f46e5', fontWeight: '600' },
 });

@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -8,13 +8,13 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import { getAllRatings } from "../../config/firestore";
+} from 'react-native';
+import { getAllRatings } from '../../config/firestore';
 
 export default function PRLRatings() {
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState("All");
+  const [selected, setSelected] = useState('All');
   const [lecturers, setLecturers] = useState([]);
 
   useEffect(() => {
@@ -26,34 +26,30 @@ export default function PRLRatings() {
       const data = await getAllRatings();
       setRatings(data);
       const uniqueLecturers = [
-        "All",
+        'All',
         ...new Set(data.map((r) => r.lecturerName).filter(Boolean)),
       ];
       setLecturers(uniqueLecturers);
     } catch (e) {
-      console.log("Error:", e);
+      console.log('Error:', e);
     }
     setLoading(false);
   };
 
-  const filtered =
-    selected === "All"
-      ? ratings
-      : ratings.filter((r) => r.lecturerName === selected);
+  const filtered = selected === 'All'
+    ? ratings
+    : ratings.filter((r) => r.lecturerName === selected);
 
-  const avgRating =
-    filtered.length > 0
-      ? (filtered.reduce((a, b) => a + b.rating, 0) / filtered.length).toFixed(
-          1,
-        )
-      : "0.0";
+  const avgRating = filtered.length > 0
+    ? (filtered.reduce((a, b) => a + b.rating, 0) / filtered.length).toFixed(1)
+    : '0.0';
 
   const Stars = ({ count }) => (
-    <View style={{ flexDirection: "row", gap: 2 }}>
+    <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map((s) => (
         <Text
           key={s}
-          style={{ fontSize: 14, color: s <= count ? "#f59e0b" : "#2a2f5c" }}
+          style={{ fontSize: 14, color: s <= count ? '#f59e0b' : '#2a2f5c' }}
         >
           ★
         </Text>
@@ -66,7 +62,7 @@ export default function PRLRatings() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={styles.backBtn}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Ratings</Text>
           <View style={{ width: 50 }} />
@@ -79,26 +75,14 @@ export default function PRLRatings() {
         </View>
 
         <Text style={styles.sectionTitle}>Filter by Lecturer</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
           {lecturers.map((l) => (
             <TouchableOpacity
               key={l}
-              style={[
-                styles.filterBtn,
-                selected === l && styles.filterBtnActive,
-              ]}
+              style={[styles.filterBtn, selected === l && styles.filterBtnActive]}
               onPress={() => setSelected(l)}
             >
-              <Text
-                style={[
-                  styles.filterText,
-                  selected === l && styles.filterTextActive,
-                ]}
-              >
+              <Text style={[styles.filterText, selected === l && styles.filterTextActive]}>
                 {l}
               </Text>
             </TouchableOpacity>
@@ -118,22 +102,20 @@ export default function PRLRatings() {
               <View style={styles.ratingHeader}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
-                    {item.studentName?.charAt(0) || "S"}
+                    {item.studentName?.charAt(0) || 'S'}
                   </Text>
                 </View>
                 <View style={styles.ratingInfo}>
                   <Text style={styles.studentName}>
-                    {item.studentName || "Student"}
+                    {item.studentName || 'Student'}
                   </Text>
                   <Text style={styles.lecturerName}>
-                    {item.lecturerName} • {item.course || "N/A"}
+                    {item.lecturerName} - {item.course || 'N/A'}
                   </Text>
                 </View>
               </View>
               <Stars count={item.rating} />
-              {item.comment ? (
-                <Text style={styles.ratingComment}>{item.comment}</Text>
-              ) : null}
+              {item.comment ? <Text style={styles.ratingComment}>{item.comment}</Text> : null}
             </View>
           ))
         )}
@@ -143,81 +125,64 @@ export default function PRLRatings() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0a0f2c" },
+  safe: { flex: 1, backgroundColor: '#0a0f2c' },
   container: { flex: 1, padding: 20 },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  backBtn: { color: '#4f46e5', fontSize: 18, fontWeight: '600', width: 50 },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   overallCard: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
-  overallValue: { color: "#f59e0b", fontSize: 48, fontWeight: "700" },
-  overallLabel: { color: "#6b7280", fontSize: 13, marginTop: 8 },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
+  overallValue: { color: '#f59e0b', fontSize: 48, fontWeight: '700' },
+  overallLabel: { color: '#6b7280', fontSize: 13, marginTop: 8 },
+  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 12 },
   filterScroll: { marginBottom: 16 },
   filterBtn: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
     marginRight: 8,
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
   },
-  filterBtnActive: { backgroundColor: "#4f46e5", borderColor: "#4f46e5" },
-  filterText: { color: "#6b7280", fontSize: 13, fontWeight: "500" },
-  filterTextActive: { color: "#fff" },
+  filterBtnActive: { backgroundColor: '#4f46e5', borderColor: '#4f46e5' },
+  filterText: { color: '#6b7280', fontSize: 13, fontWeight: '500' },
+  filterTextActive: { color: '#fff' },
   emptyBox: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 24,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
+  emptyText: { color: '#6b7280', fontSize: 14 },
   ratingCard: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
-  ratingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 10,
-  },
-  avatar: {
-    width: 38,
-    height: 38,
-    backgroundColor: "#4f46e5",
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  ratingHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 },
+  avatar: { width: 38, height: 38, backgroundColor: '#4f46e5', borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   ratingInfo: { flex: 1 },
-  studentName: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  lecturerName: { color: "#6b7280", fontSize: 12, marginTop: 2 },
-  ratingComment: { color: "#9ca3af", fontSize: 13, marginTop: 8 },
+  studentName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  lecturerName: { color: '#6b7280', fontSize: 12, marginTop: 2 },
+  ratingComment: { color: '#9ca3af', fontSize: 13, marginTop: 8 },
 });

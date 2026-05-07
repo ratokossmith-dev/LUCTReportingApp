@@ -1,6 +1,6 @@
-import { router } from "expo-router";
-import { signOut } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -8,14 +8,14 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import { auth } from "../../config/auth";
-import { useAuth } from "../../config/AuthContext";
+} from 'react-native';
+import { auth } from '../../config/firebase';
+import { useAuth } from '../../config/AuthContext';
 import {
   getAllCourses,
   getAllLecturers,
   getAllReports,
-} from "../../config/firestore";
+} from '../../config/firestore';
 
 export default function PRLDashboard() {
   const { profile } = useAuth();
@@ -37,7 +37,7 @@ export default function PRLDashboard() {
           getAllCourses(),
           getAllLecturers(),
         ]);
-        const pending = reports.filter((r) => r.status !== "Reviewed");
+        const pending = reports.filter((r) => r.status !== 'Reviewed');
         setStats({
           courses: courses.length,
           lecturers: lecturers.length,
@@ -46,7 +46,7 @@ export default function PRLDashboard() {
         });
         setPendingReports(pending.slice(0, 3));
       } catch (e) {
-        console.log("PRL dashboard error:", e);
+        console.log('PRL dashboard error:', e);
       }
       setLoading(false);
     })();
@@ -54,43 +54,43 @@ export default function PRLDashboard() {
 
   const initials = profile?.name
     ? profile.name
-        .split(" ")
+        .split(' ')
         .map((n) => n[0])
-        .join("")
+        .join('')
         .toUpperCase()
         .slice(0, 2)
-    : "PR";
+    : 'PR';
 
   const menu = [
     {
-      icon: "📋",
-      title: "Reports",
-      sub: "View reports & add feedback",
-      route: "/(prl)/reports",
+      icon: 'R',
+      title: 'Reports',
+      sub: 'View reports and add feedback',
+      route: '/(prl)/reports',
     },
     {
-      icon: "📊",
-      title: "Monitoring",
-      sub: "Monitor lecturer performance",
-      route: "/(prl)/monitoring",
+      icon: 'M',
+      title: 'Monitoring',
+      sub: 'Monitor lecturer performance',
+      route: '/(prl)/monitoring',
     },
     {
-      icon: "⭐",
-      title: "Ratings",
-      sub: "View all student ratings",
-      route: "/(prl)/ratings",
+      icon: 'S',
+      title: 'Ratings',
+      sub: 'View all student ratings',
+      route: '/(prl)/ratings',
     },
     {
-      icon: "📚",
-      title: "Courses",
-      sub: "View all courses",
-      route: "/(prl)/courses",
+      icon: 'C',
+      title: 'Courses',
+      sub: 'View all courses',
+      route: '/(prl)/courses',
     },
     {
-      icon: "🏫",
-      title: "Classes",
-      sub: "View all classes",
-      route: "/(prl)/classes",
+      icon: 'L',
+      title: 'Classes',
+      sub: 'View all classes',
+      route: '/(prl)/classes',
     },
   ];
 
@@ -99,8 +99,8 @@ export default function PRLDashboard() {
       <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
         <View style={s.header}>
           <View>
-            <Text style={s.greeting}>Welcome back 👋</Text>
-            <Text style={s.name}>{profile?.name || "Principal Lecturer"}</Text>
+            <Text style={s.greeting}>Welcome back</Text>
+            <Text style={s.name}>{profile?.name || 'Principal Lecturer'}</Text>
             <Text style={s.role}>Principal Lecturer</Text>
           </View>
           <View style={s.avatar}>
@@ -114,25 +114,25 @@ export default function PRLDashboard() {
         ) : (
           <View style={s.grid}>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#4f46e5" }]}>
+              <Text style={[s.statVal, { color: '#4f46e5' }]}>
                 {stats.courses}
               </Text>
               <Text style={s.statLabel}>Courses</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#10b981" }]}>
+              <Text style={[s.statVal, { color: '#10b981' }]}>
                 {stats.lecturers}
               </Text>
               <Text style={s.statLabel}>Lecturers</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#f59e0b" }]}>
+              <Text style={[s.statVal, { color: '#f59e0b' }]}>
                 {stats.reports}
               </Text>
               <Text style={s.statLabel}>Total Reports</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={[s.statVal, { color: "#ef4444" }]}>
+              <Text style={[s.statVal, { color: '#ef4444' }]}>
                 {stats.pending}
               </Text>
               <Text style={s.statLabel}>Pending Review</Text>
@@ -143,7 +143,7 @@ export default function PRLDashboard() {
         <Text style={s.section}>Reports Needing Review</Text>
         {pendingReports.length === 0 ? (
           <View style={s.empty}>
-            <Text style={s.emptyText}>✅ All reports have been reviewed!</Text>
+            <Text style={s.emptyText}>All reports have been reviewed</Text>
           </View>
         ) : (
           <View style={s.card}>
@@ -154,18 +154,18 @@ export default function PRLDashboard() {
               >
                 <View style={s.rAvatar}>
                   <Text style={s.rAvatarText}>
-                    {r.lecturerName?.charAt(0) || "L"}
+                    {r.lecturerName?.charAt(0) || 'L'}
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.rName}>{r.lecturerName}</Text>
                   <Text style={s.rSub}>
-                    {r.className} — Week {r.weekOfReporting}
+                    {r.className} - Week {r.weekOfReporting}
                   </Text>
                 </View>
                 <TouchableOpacity
                   style={s.reviewBtn}
-                  onPress={() => router.push("/(prl)/reports")}
+                  onPress={() => router.push('/(prl)/reports')}
                 >
                   <Text style={s.reviewBtnText}>Review</Text>
                 </TouchableOpacity>
@@ -198,7 +198,7 @@ export default function PRLDashboard() {
           style={s.logout}
           onPress={async () => {
             await signOut(auth);
-            router.replace("/(auth)/login");
+            router.replace('/(auth)/login');
           }}
         >
           <Text style={s.logoutText}>Logout</Text>
@@ -209,111 +209,111 @@ export default function PRLDashboard() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0a0f2c" },
+  safe: { flex: 1, backgroundColor: '#0a0f2c' },
   container: { flex: 1, padding: 24 },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
     marginTop: 16,
   },
-  greeting: { color: "#6b7280", fontSize: 14, marginBottom: 4 },
-  name: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 2 },
-  role: { color: "#f59e0b", fontSize: 12 },
+  greeting: { color: '#6b7280', fontSize: 14, marginBottom: 4 },
+  name: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 2 },
+  role: { color: '#f59e0b', fontSize: 12 },
   avatar: {
     width: 50,
     height: 50,
-    backgroundColor: "#f59e0b",
+    backgroundColor: '#f59e0b',
     borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  section: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 14 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
+  avatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  section: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 14 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
   statCard: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 16,
-    width: "47%",
+    width: '47%',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
-  statVal: { fontSize: 28, fontWeight: "700", marginBottom: 4 },
-  statLabel: { color: "#6b7280", fontSize: 12 },
+  statVal: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  statLabel: { color: '#6b7280', fontSize: 12 },
   empty: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 20,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
     marginBottom: 28,
   },
-  emptyText: { color: "#6b7280", fontSize: 14 },
+  emptyText: { color: '#6b7280', fontSize: 14 },
   card: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 16,
     padding: 4,
     marginBottom: 28,
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
-  row: { flexDirection: "row", alignItems: "center", padding: 12, gap: 12 },
-  rowBorder: { borderBottomWidth: 0.5, borderBottomColor: "#2a2f5c" },
+  row: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
+  rowBorder: { borderBottomWidth: 0.5, borderBottomColor: '#2a2f5c' },
   rAvatar: {
     width: 38,
     height: 38,
-    backgroundColor: "#4f46e5",
+    backgroundColor: '#4f46e5',
     borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rAvatarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  rName: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  rSub: { color: "#6b7280", fontSize: 12 },
+  rAvatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  rName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  rSub: { color: '#6b7280', fontSize: 12 },
   reviewBtn: {
-    backgroundColor: "#f59e0b",
+    backgroundColor: '#f59e0b',
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  reviewBtnText: { color: "#000", fontSize: 12, fontWeight: "700" },
+  reviewBtnText: { color: '#000', fontSize: 12, fontWeight: '700' },
   menuList: { gap: 10, marginBottom: 28 },
   menuItem: {
-    backgroundColor: "#1a1f3c",
+    backgroundColor: '#1a1f3c',
     borderRadius: 14,
     padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: "#2a2f5c",
+    borderColor: '#2a2f5c',
   },
   menuIcon: {
     width: 42,
     height: 42,
-    backgroundColor: "#0a0f2c",
+    backgroundColor: '#0a0f2c',
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 14,
   },
   menuTitle: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 2,
   },
-  menuSub: { color: "#6b7280", fontSize: 11 },
-  arrow: { color: "#f59e0b", fontSize: 24, fontWeight: "300" },
+  menuSub: { color: '#6b7280', fontSize: 11 },
+  arrow: { color: '#f59e0b', fontSize: 24, fontWeight: '300' },
   logout: {
     borderWidth: 0.5,
-    borderColor: "#ef4444",
+    borderColor: '#ef4444',
     borderRadius: 14,
     padding: 15,
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 32,
   },
-  logoutText: { color: "#ef4444", fontSize: 15, fontWeight: "600" },
+  logoutText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
 });

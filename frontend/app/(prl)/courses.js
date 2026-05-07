@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -9,13 +9,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import { getAllCourses } from "../../config/firestore";
+} from 'react-native';
+import { getAllCourses } from '../../config/firestore';
 
 export default function PRLCourses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     loadCourses();
@@ -26,7 +26,7 @@ export default function PRLCourses() {
       const data = await getAllCourses();
       setCourses(data);
     } catch (e) {
-      console.log("Error:", e);
+      console.log('Error:', e);
     }
     setLoading(false);
   };
@@ -34,13 +34,8 @@ export default function PRLCourses() {
   const filtered = courses.filter(
     (c) =>
       !search ||
-      (c.courseName || c.name || "")
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      (c.courseCode || c.code || "")
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      (c.lecturerName || "").toLowerCase().includes(search.toLowerCase()),
+      (c.courseName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.courseCode || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -48,7 +43,7 @@ export default function PRLCourses() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>‹ Back</Text>
+            <Text style={styles.backBtn}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Courses</Text>
           <View style={{ width: 50 }} />
@@ -56,14 +51,14 @@ export default function PRLCourses() {
 
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#4f46e5" }]}>
+            <Text style={[styles.statValue, { color: '#4f46e5' }]}>
               {courses.length}
             </Text>
             <Text style={styles.statLabel}>Total Courses</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: "#10b981" }]}>
-              {courses.filter((c) => c.status === "Active").length}
+            <Text style={[styles.statValue, { color: '#10b981' }]}>
+              {courses.filter((c) => c.status === 'Active').length}
             </Text>
             <Text style={styles.statLabel}>Active</Text>
           </View>
@@ -90,35 +85,35 @@ export default function PRLCourses() {
               <View style={styles.courseHeader}>
                 <View style={styles.codeBadge}>
                   <Text style={styles.codeBadgeText}>
-                    {course.courseCode || course.code || "N/A"}
+                    {course.courseCode || 'N/A'}
                   </Text>
                 </View>
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>
-                    {course.status || "Active"}
+                    {course.status || 'Active'}
                   </Text>
                 </View>
               </View>
               <Text style={styles.courseName}>
-                {course.courseName || course.name}
+                {course.courseName}
               </Text>
               <View style={styles.details}>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>👨‍🏫</Text>
+                  <Text style={styles.detailIcon}>L</Text>
                   <Text style={styles.detailText}>
-                    {course.lecturerName || "TBA"}
+                    Lecturers: {course.lecturerIds?.length || 0}
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>👥</Text>
+                  <Text style={styles.detailIcon}>S</Text>
                   <Text style={styles.detailText}>
-                    {course.totalStudents || course.students || 0} Students
+                    Students: {course.studentIds?.length || 0}
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailIcon}>📅</Text>
+                  <Text style={styles.detailIcon}>T</Text>
                   <Text style={styles.detailText}>
-                    Semester {course.semester || "N/A"}
+                    Semester: {course.semester || 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -131,90 +126,34 @@ export default function PRLCourses() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0a0f2c" },
+  safe: { flex: 1, backgroundColor: '#0a0f2c' },
   container: { flex: 1, padding: 20 },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
     marginTop: 16,
   },
-  backBtn: { color: "#4f46e5", fontSize: 18, fontWeight: "600", width: 50 },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
-  statBox: {
-    flex: 1,
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  statValue: { fontSize: 28, fontWeight: "700" },
-  statLabel: { color: "#6b7280", fontSize: 12, marginTop: 4 },
-  searchInput: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 12,
-    padding: 12,
-    color: "#fff",
-    marginBottom: 20,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-    fontSize: 14,
-  },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  emptyBox: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 14,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  emptyText: { color: "#6b7280", fontSize: 14 },
-  courseCard: {
-    backgroundColor: "#1a1f3c",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 0.5,
-    borderColor: "#2a2f5c",
-  },
-  courseHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  codeBadge: {
-    backgroundColor: "#4f46e5",
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  codeBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  statusBadge: {
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderWidth: 0.5,
-    borderColor: "#10b981",
-  },
-  statusText: { color: "#10b981", fontSize: 12, fontWeight: "600" },
-  courseName: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
+  backBtn: { color: '#4f46e5', fontSize: 18, fontWeight: '600', width: 50 },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  statBox: { flex: 1, backgroundColor: '#1a1f3c', borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 0.5, borderColor: '#2a2f5c' },
+  statValue: { fontSize: 28, fontWeight: '700' },
+  statLabel: { color: '#6b7280', fontSize: 12, marginTop: 4 },
+  searchInput: { backgroundColor: '#1a1f3c', borderRadius: 12, padding: 12, color: '#fff', marginBottom: 20, borderWidth: 0.5, borderColor: '#2a2f5c', fontSize: 14 },
+  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 12 },
+  emptyBox: { backgroundColor: '#1a1f3c', borderRadius: 14, padding: 24, alignItems: 'center', borderWidth: 0.5, borderColor: '#2a2f5c' },
+  emptyText: { color: '#6b7280', fontSize: 14 },
+  courseCard: { backgroundColor: '#1a1f3c', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 0.5, borderColor: '#2a2f5c' },
+  courseHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  codeBadge: { backgroundColor: '#4f46e5', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
+  codeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  statusBadge: { borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, borderWidth: 0.5, borderColor: '#10b981' },
+  statusText: { color: '#10b981', fontSize: 12, fontWeight: '600' },
+  courseName: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 12 },
   details: { gap: 6 },
-  detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  detailIcon: { fontSize: 14 },
-  detailText: { color: "#9ca3af", fontSize: 13 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailIcon: { fontSize: 14, color: '#6b7280' },
+  detailText: { color: '#9ca3af', fontSize: 13 },
 });

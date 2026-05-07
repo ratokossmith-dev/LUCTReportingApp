@@ -6,17 +6,26 @@
     "orientation": "portrait",
     "scheme": "luctreportingapp",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0a0f2c"
-      }
+      },
+      "package": "com.ratoko.LUCTReportingApp"
     },
     "plugins": [
-      "expo-router"
-    ]
+      "expo-router",
+      "expo-font",
+      "expo-image",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b34b1d24-89a4-4039-9e16-8a5cb2e49bf7"
+      }
+    }
   }
 }

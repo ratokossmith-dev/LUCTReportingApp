@@ -1,156 +1,79 @@
-import api from './api';
+import api from './auth';
 
-export const getAllCourses = () =>
-  api.request('/courses');
+export const getAllCourses = () => api.getAllCourses();
 
-export const getCoursesByLecturer = () =>
-  api.request('/courses/my-courses');
+export const getCoursesByLecturer = () => api.getMyCourses();
 
-export const getAvailableCoursesForLecturer = () =>
-  api.request('/courses/my-courses');
+export const getAvailableCoursesForLecturer = async (lecturerId) => {
+  const allCourses = await api.getAllCourses();
+  const myCourses = await api.getMyCourses();
+  const myCourseIds = myCourses.map(c => c.id);
+  return allCourses.filter(c => !myCourseIds.includes(c.id));
+};
 
-export const getStudentCourses = () =>
-  api.request('/courses/my-courses');
+export const getStudentCourses = () => api.getMyCourses();
 
-export const getAvailableCoursesForStudent = () =>
-  api.request('/courses');
+export const getAvailableCoursesForStudent = () => api.getAllCourses();
 
-export const addCourse = (data) =>
-  api.request('/courses', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export const addCourse = (data) => api.createCourse(data);
 
-export const assignLecturersToCourse = (courseId, lecturerIds) =>
-  api.request(`/courses/${courseId}/assign-lecturers`, {
-    method: 'POST',
-    body: JSON.stringify({ lecturerIds }),
-  });
+export const assignLecturersToCourse = (courseId, lecturerIds) => 
+  api.assignLecturersToCourse(courseId, lecturerIds);
 
-export const assignStudentsToCourse = (courseId, studentIds) =>
-  api.request(`/courses/${courseId}/assign-students`, {
-    method: 'POST',
-    body: JSON.stringify({ studentIds }),
-  });
+export const assignStudentsToCourse = (courseId, studentIds) => 
+  api.assignStudentsToCourse(courseId, studentIds);
 
-export const addStudentToCourse = (courseId, studentId, name, email) =>
-  api.request(`/courses/${courseId}/assign-students`, {
-    method: 'POST',
-    body: JSON.stringify({ studentIds: [studentId], name, email }),
-  });
+export const addStudentToCourse = (courseId, studentId, name, email) => 
+  api.assignStudentsToCourse(courseId, [studentId]);
 
-export const deleteCourse = (courseId) =>
-  api.request(`/courses/${courseId}`, {
-    method: 'DELETE',
-  });
+export const deleteCourse = (courseId) => api.deleteCourse(courseId);
 
-export const getAllClasses = () =>
-  api.request('/classes');
+export const getAllClasses = () => api.getAllClasses();
 
-export const getClassesByLecturer = () =>
-  api.request('/classes/my-classes');
+export const getClassesByLecturer = () => api.getMyClasses();
 
-export const getClassesByStudent = () =>
-  api.request('/classes/my-classes');
+export const getClassesByStudent = () => api.getMyClasses();
 
-export const addClass = (data) =>
-  api.request('/classes', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export const addClass = (data) => api.createClass(data);
 
-export const deleteClass = (classId) =>
-  api.request(`/classes/${classId}`, {
-    method: 'DELETE',
-  });
+export const deleteClass = (classId) => api.deleteClass(classId);
 
-export const getEnrollmentsByClass = (classId) =>
-  api.request(`/attendance/class/${classId}`);
+export const getEnrollmentsByClass = (classId) => api.getClassAttendance(classId);
 
-export const saveAttendance = (data) =>
-  api.request('/attendance', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export const saveAttendance = (data) => api.saveAttendance(data);
 
-export const getClassAttendance = (classId) =>
-  api.request(`/attendance/class/${classId}`);
+export const getClassAttendance = (classId) => api.getClassAttendance(classId);
 
-export const getStudentAttendance = () =>
-  api.request('/attendance/my-attendance');
+export const getStudentAttendance = () => api.getMyAttendance();
 
-export const submitReport = (data) =>
-  api.request('/reports', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export const submitReport = (data) => api.submitReport(data);
 
-export const getReportsByLecturer = () =>
-  api.request('/reports/my-reports');
+export const getReportsByLecturer = () => api.getMyReports();
 
-export const getAllReports = () =>
-  api.request('/reports/all');
+export const getAllReports = () => api.getAllReports();
 
-export const addFeedbackToReport = (reportId, feedback) =>
-  api.request(`/reports/${reportId}/feedback`, {
-    method: 'PUT',
-    body: JSON.stringify({ feedback }),
-  });
+export const addFeedbackToReport = (reportId, feedback) => 
+  api.addReportFeedback(reportId, feedback);
 
-export const deleteReport = (reportId) =>
-  api.request(`/reports/${reportId}`, {
-    method: 'DELETE',
-  });
+export const deleteReport = (reportId) => api.deleteReport(reportId);
 
-export const submitRating = (data) =>
-  api.request('/ratings', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export const submitRating = (data) => api.submitRating(data);
 
-export const getRatingsByLecturer = () =>
-  api.request('/ratings/my-ratings');
+export const getRatingsByLecturer = () => api.getMyRatings();
 
-export const getStudentRatings = () =>
-  api.request('/ratings/my-ratings');
+export const getStudentRatings = () => api.getMyRatings();
 
-export const getAllRatings = () =>
-  api.request('/ratings/all');
+export const getAllRatings = () => api.getAllRatings();
 
-export const getAllStudents = () =>
-  api.request('/users/students');
+export const getAllStudents = () => api.getAllStudents();
 
-export const getAllLecturers = () =>
-  api.request('/users/lecturers');
+export const getAllLecturers = () => api.getAllLecturers();
 
-export const addLecturer = (data) =>
-  api.request('/users/lecturers', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export const addLecturer = (data) => api.createLecturer(data);
 
-export const deleteUser = (userId) =>
-  api.request(`/users/${userId}`, {
-    method: 'DELETE',
-  });
+export const deleteUser = (userId) => api.deleteUser(userId);
 
-export const getStudentsNotInCourse = (courseId) =>
-  api.request(`/users/students-not-in-course/${courseId}`);
+export const getStudentsNotInCourse = (courseId) => api.getStudentsNotInCourse(courseId);
 
-export const lecturerAddStudentToCourse = (courseId, studentId) =>
-  api.request(`/courses/${courseId}/assign-students`, {
-    method: 'POST',
-    body: JSON.stringify({ studentIds: [studentId] }),
-  });
-
-export const addStudentToAllCourses = (uid, name, email) =>
-  api.request('/courses/enroll-all', {
-    method: 'POST',
-    body: JSON.stringify({ uid, name, email }),
-  });
-
-export const enrollNewStudentInAllClasses = (uid, name, email) =>
-  api.request('/classes/enroll-all', {
-    method: 'POST',
-    body: JSON.stringify({ uid, name, email }),
-  });
+export const lecturerAddStudentToCourse = (courseId, studentId) => 
+  api.assignStudentsToCourse(courseId, [studentId]);
